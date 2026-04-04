@@ -253,6 +253,15 @@
             </div>
           </div>
         </article>
+
+        <PlanningInsightPanel
+          :student-profile="studentProfile"
+          :active-plan="activePlan"
+          :selected-job-id="selectedJobId"
+          :selected-job-detail="selectedJobDetail"
+          @plan-adjusted="handlePlanAdjusted"
+          @notice="handleInsightNotice"
+        />
       </section>
 
       <section v-if="isAuthenticated && currentTab === 'archive'" class="grid archive-layout">
@@ -314,6 +323,7 @@ import { completePlanTask, generatePlan, getPlan, listPlans } from './api/module
 import { completeStudentProfile, createProfileByManualInput, getProfileMissingFields, getStudentProfile, updateStudentProfile, uploadResumeFile } from './api/modules/profile'
 import { exportGeneratedReport, generateReport, getReport, listReports, polishGeneratedReport } from './api/modules/report'
 import { clearClientSession, clearStoredChatSessionId, getAccessToken, getActiveProfileId, getChatSessionId, setActiveProfileId, setChatSessionId } from './api/session'
+import PlanningInsightPanel from './components/PlanningInsightPanel.vue'
 
 const navigationItems = [
   { key: 'auth', label: '账户接入', requiresAuth: false },
@@ -854,7 +864,23 @@ function formatSalaryRange(min, max) {
   return `${min ?? '--'} - ${max ?? '--'}`
 }
 
+async function handlePlanAdjusted(plan) {
+  activePlan.value = plan
+  await refreshPlans(false)
+}
+
+function handleInsightNotice(payload) {
+  if (!payload) {
+    return
+  }
+  setNotice(payload.text, payload.type)
+}
+
 onMounted(() => {
   initializeApp()
 })
 </script>
+
+
+
+
