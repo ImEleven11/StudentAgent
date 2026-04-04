@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,7 +70,7 @@ public class ReportServiceImpl implements ReportService {
         report.setUserId(userId);
         report.setProfileId(profile.getId());
         report.setTargetJobId(targetJob == null ? null : targetJob.getId());
-        report.setTitle(targetJob == null ? "职业规划报告" : targetJob.getTitle() + " 职业规划报告");
+        report.setTitle(targetJob == null ? "Career Planning Report" : targetJob.getTitle() + " Career Planning Report");
         report.setContentJson(toJson(buildSections(profile, targetJob)));
         reportMapper.insert(report);
         return new ReportGenerateResponse(report.getId());
@@ -95,17 +96,20 @@ public class ReportServiceImpl implements ReportService {
     public ResponseEntity<ByteArrayResource> export(Long userId, Long reportId, String format) {
         ReportEntity report = requireOwnedReport(userId, reportId);
         String normalizedFormat = normalizeFormat(format);
-        String content = StringUtils.hasText(report.getPolishedContent())
-                ? report.getPolishedContent()
-                : buildPolishedContent(readSections(report.getContentJson()));
-        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        List<ReportSectionResponse> sections = readSections(report.getContentJson());
+        byte[] bytes = "pdf".equals(normalizedFormat)
+                ? buildPdfBytes(report, sections)
+                : buildWordBytes(report, sections);
         ByteArrayResource resource = new ByteArrayResource(bytes);
-        String filename = "report-" + report.getId() + ("pdf".equals(normalizedFormat) ? ".pdf" : ".docx");
+        String filename = "report-" + report.getId() + ("pdf".equals(normalizedFormat) ? ".pdf" : ".doc");
+        MediaType mediaType = "pdf".equals(normalizedFormat)
+                ? MediaType.APPLICATION_PDF
+                : MediaType.parseMediaType("application/msword");
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
                 .contentLength(bytes.length)
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(mediaType)
                 .body(resource);
     }
 
@@ -167,28 +171,30 @@ public class ReportServiceImpl implements ReportService {
 
         List<ReportSectionResponse> sections = new ArrayList<>();
         sections.add(new ReportSectionResponse(
-                "画像概览",
-                "当前画像完整度为 " + profile.getCompletenessScore() + "，能力得分为 " + profile.getAbilityScore() + "，竞争力得分为 " + profile.getCompetitivenessScore() + "。"
+                "Profile Overview",
+                "Current profile completeness is " + profile.getCompletenessScore()
+                        + ", ability score is " + profile.getAbilityScore()
+                        + ", and competitiveness score is " + profile.getCompetitivenessScore() + "."
         ));
         sections.add(new ReportSectionResponse(
-                "能力与经历分析",
-                "当前已识别技能：" + String.join("、", profileSkills) + "。教育背景概述：" + safe(profile.getEducationSummary()) + "。"
+                "Skills and Experience",
+                "Recognized skills: " + joinValues(profileSkills) + ". Education summary: " + safe(profile.getEducationSummary()) + "."
         ));
         sections.add(new ReportSectionResponse(
-                "目标岗位洞察",
+                "Target Role Insight",
                 targetJob == null
-                        ? "当前尚未指定目标岗位，建议结合兴趣与市场需求进一步明确方向。"
-                        : "目标岗位为 " + targetJob.getTitle() + "，岗位核心技能包括：" + String.join("、", jobSkills) + "。"
+                        ? "No target role is selected yet. Refine the direction with your interests and current market demand."
+                        : "Target role: " + targetJob.getTitle() + ". Core skills include: " + joinValues(jobSkills) + "."
         ));
         sections.add(new ReportSectionResponse(
-                "差距分析",
+                "Gap Analysis",
                 missingSkills.isEmpty()
-                        ? "当前画像与目标岗位要求较为接近，重点在于项目实践与求职表达。"
-                        : "与目标岗位相比，建议优先补齐以下技能差距：" + String.join("、", missingSkills) + "。"
+                        ? "The current profile is already close to the target role. Focus on project practice and interview communication."
+                        : "Compared with the target role, prioritize these missing skills: " + joinValues(missingSkills) + "."
         ));
         sections.add(new ReportSectionResponse(
-                "行动建议",
-                "建议围绕画像补全、能力补齐、项目实践、简历优化和投递准备分阶段推进。"
+                "Action Plan",
+                "Move forward in phases: complete the profile, close skill gaps, build project evidence, improve the resume, and prepare for applications."
         ));
         return sections;
     }
@@ -237,13 +243,84 @@ public class ReportServiceImpl implements ReportService {
 
     private String buildPolishedContent(List<ReportSectionResponse> sections) {
         StringBuilder builder = new StringBuilder();
-        builder.append("职业规划报告").append(System.lineSeparator()).append(System.lineSeparator());
+        builder.append("Career Planning Report").append(System.lineSeparator()).append(System.lineSeparator());
         for (ReportSectionResponse section : sections) {
             builder.append(section.title()).append(System.lineSeparator());
             builder.append(section.content()).append(System.lineSeparator()).append(System.lineSeparator());
         }
-        builder.append("建议你结合阶段化计划持续推进，并定期复盘执行情况。");
+        builder.append("Keep advancing with the staged plan and review progress regularly.");
         return builder.toString();
+    }
+
+    private byte[] buildWordBytes(ReportEntity report, List<ReportSectionResponse> sections) {
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><meta charset=\"UTF-8\"></head><body>");
+        html.append("<h1>").append(escapeHtml(report.getTitle())).append("</h1>");
+        for (ReportSectionResponse section : sections) {
+            html.append("<h2>").append(escapeHtml(section.title())).append("</h2>");
+            html.append("<p>").append(escapeHtml(section.content())).append("</p>");
+        }
+        html.append("<p>").append(escapeHtml("Keep advancing with the staged plan and review progress regularly.")).append("</p>");
+        html.append("</body></html>");
+        return html.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private byte[] buildPdfBytes(ReportEntity report, List<ReportSectionResponse> sections) {
+        List<String> lines = new ArrayList<>();
+        lines.add(sanitizePdfText(report.getTitle()));
+        lines.add("");
+        for (ReportSectionResponse section : sections) {
+            lines.add(sanitizePdfText(section.title()));
+            lines.addAll(wrapPdfLine(sanitizePdfText(section.content()), 88));
+            lines.add("");
+        }
+        lines.add("Keep advancing with the staged plan and review progress regularly.");
+
+        StringBuilder content = new StringBuilder();
+        content.append("BT\n");
+        content.append("/F1 12 Tf\n");
+        content.append("50 780 Td\n");
+
+        boolean firstLine = true;
+        for (String line : lines.stream().limit(40).toList()) {
+            if (!firstLine) {
+                content.append("0 -16 Td\n");
+            }
+            content.append("(").append(escapePdfText(line)).append(") Tj\n");
+            firstLine = false;
+        }
+        content.append("ET\n");
+
+        byte[] contentBytes = content.toString().getBytes(StandardCharsets.US_ASCII);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        List<Integer> offsets = new ArrayList<>();
+        writeAscii(output, "%PDF-1.4\n");
+
+        offsets.add(output.size());
+        writeAscii(output, "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+        offsets.add(output.size());
+        writeAscii(output, "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+
+        offsets.add(output.size());
+        writeAscii(output, "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
+
+        offsets.add(output.size());
+        writeAscii(output, "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+
+        offsets.add(output.size());
+        writeAscii(output, "5 0 obj\n<< /Length " + contentBytes.length + " >>\nstream\n");
+        output.writeBytes(contentBytes);
+        writeAscii(output, "endstream\nendobj\n");
+
+        int xrefOffset = output.size();
+        writeAscii(output, "xref\n0 6\n");
+        writeAscii(output, "0000000000 65535 f \n");
+        for (Integer offset : offsets) {
+            writeAscii(output, String.format("%010d 00000 n \n", offset));
+        }
+        writeAscii(output, "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
+        return output.toByteArray();
     }
 
     private String normalizeFormat(String format) {
@@ -258,6 +335,58 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private String safe(String value) {
-        return StringUtils.hasText(value) ? value : "待补充";
+        return StringUtils.hasText(value) ? value : "Not provided";
+    }
+
+    private String joinValues(List<String> values) {
+        return values == null || values.isEmpty() ? "None" : String.join(", ", values);
+    }
+
+    private List<String> wrapPdfLine(String value, int maxLength) {
+        if (!StringUtils.hasText(value) || value.length() <= maxLength) {
+            return List.of(value);
+        }
+
+        List<String> lines = new ArrayList<>();
+        int start = 0;
+        while (start < value.length()) {
+            int end = Math.min(start + maxLength, value.length());
+            lines.add(value.substring(start, end));
+            start = end;
+        }
+        return lines;
+    }
+
+    private String sanitizePdfText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(value.length());
+        for (char character : value.toCharArray()) {
+            builder.append(character <= 0x7F ? character : '?');
+        }
+        return builder.toString();
+    }
+
+    private String escapePdfText(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("(", "\\(")
+                .replace(")", "\\)");
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private void writeAscii(ByteArrayOutputStream output, String value) {
+        output.writeBytes(value.getBytes(StandardCharsets.US_ASCII));
     }
 }

@@ -14,9 +14,13 @@ node_modules/
 dist/
 dist-ssr/
 target/
+data/
+BackEnd/data/
+BackEnd/logs/
 
 # Local environment files
 *.local
+tmp-*
 
 # Editor files
 .vscode/

@@ -52,6 +52,12 @@ springdoc:
   swagger-ui:
     path: /swagger-ui/index.html
 
+logging:
+  file:
+    name: ./logs/student-agent-backend.log
+  level:
+    com.uestc.studentagent.backend: INFO
+
 app:
   security:
     jwt:

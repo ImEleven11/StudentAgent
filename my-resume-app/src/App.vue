@@ -400,6 +400,13 @@ function clearTransientState() {
   activeReport.value = null
 }
 
+function resetAuthForm() {
+  authForm.account = ''
+  authForm.username = ''
+  authForm.email = ''
+  authForm.password = ''
+}
+
 function syncUserProfileForm(user) {
   userProfileForm.nickname = user?.nickname || ''
   userProfileForm.avatar = user?.avatar || ''
@@ -457,7 +464,8 @@ async function refreshJobSearch() {
   try {
     const pageData = await searchJobs(jobSearchForm)
     jobResults.value = pageData?.records || []
-    if (!selectedJobId.value && jobResults.value.length) {
+    const selectedJobStillExists = jobResults.value.some((job) => job.jobId === selectedJobId.value)
+    if ((!selectedJobId.value || !selectedJobStillExists) && jobResults.value.length) {
       await handleSelectJob(jobResults.value[0].jobId, false)
     }
   } catch (error) {
@@ -606,6 +614,7 @@ async function handleAuthSubmit() {
       ? (await registerUser({ username: authForm.username, email: authForm.email, password: authForm.password }), await loginUser({ account: authForm.username, password: authForm.password }))
       : await loginUser({ account: authForm.account, password: authForm.password })
     currentUser.value = loginResponse.user
+    resetAuthForm()
     syncUserProfileForm(currentUser.value)
     currentTab.value = 'profile'
     setNotice(authMode.value === 'register' ? '注册成功，已自动完成登录。' : '登录成功，JWT 已保存到本地。', 'success')
@@ -628,6 +637,7 @@ async function handleLogout() {
   try {
     await logoutUser()
     currentUser.value = null
+    resetAuthForm()
     clearTransientState()
     seedChatMessages()
     currentTab.value = 'auth'
@@ -675,7 +685,8 @@ async function handleProfileSubmit() {
   loading.profile = true
   try {
     const payload = buildProfilePayload()
-    if (!studentProfile.value) {
+    const creatingProfile = !studentProfile.value
+    if (creatingProfile) {
       const response = await createProfileByManualInput(payload)
       await hydrateProfile(response.profileId)
     } else {
@@ -683,7 +694,7 @@ async function handleProfileSubmit() {
       await hydrateProfile(updated.profileId)
     }
     currentTab.value = 'chat'
-    setNotice(studentProfile.value ? '学生画像已更新。' : '学生画像已创建。', 'success')
+    setNotice(creatingProfile ? '学生画像已创建。' : '学生画像已更新。', 'success')
   } catch (error) {
     setNotice(error.message || '画像保存失败。', 'error')
   } finally {
@@ -739,8 +750,10 @@ async function handleGeneratePlan() {
   }
   loading.plan = true
   try {
-    activePlan.value = await generatePlan({ profileId: activeProfileId.value, targetJobId: selectedJobId.value || null })
+    const generatedPlan = await generatePlan({ profileId: activeProfileId.value, targetJobId: selectedJobId.value || null })
+    activePlan.value = generatedPlan
     await refreshPlans(false)
+    planItems.value = [generatedPlan, ...planItems.value.filter((item) => item.planId !== generatedPlan.planId)]
     setNotice('阶段计划已生成。', 'success')
   } catch (error) {
     setNotice(error.message || '计划生成失败。', 'error')
@@ -784,8 +797,19 @@ async function handleGenerateReport() {
   loading.report = true
   try {
     const response = await generateReport({ profileId: activeProfileId.value, targetJobId: selectedJobId.value || null })
-    activeReport.value = await getReport(response.reportId)
+    const generatedReport = await getReport(response.reportId)
+    activeReport.value = generatedReport
     await refreshReports(false)
+    reportItems.value = [
+      {
+        reportId: generatedReport.reportId,
+        profileId: generatedReport.profileId,
+        targetJobId: generatedReport.targetJobId,
+        title: generatedReport.title,
+        createdAt: generatedReport.createdAt,
+      },
+      ...reportItems.value.filter((item) => item.reportId !== generatedReport.reportId),
+    ]
     currentTab.value = 'archive'
     setNotice('职业报告已生成。', 'success')
   } catch (error) {
@@ -880,6 +904,8 @@ onMounted(() => {
   initializeApp()
 })
 </script>
+
+
 
 
 

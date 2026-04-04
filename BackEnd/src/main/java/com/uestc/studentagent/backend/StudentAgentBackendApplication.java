@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
-@MapperScan("com.uestc.studentagent.backend")
+@MapperScan(basePackages = "com.uestc.studentagent.backend", annotationClass = org.apache.ibatis.annotations.Mapper.class)
 @ConfigurationPropertiesScan
 public class StudentAgentBackendApplication {
 
