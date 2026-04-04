@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.profile.mapper.StudentProfileMapper">
+
+    <resultMap id="StudentProfileMap" type="com.uestc.studentagent.backend.profile.entity.StudentProfileEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="education_summary" property="educationSummary"/>
+        <result column="skills_json" property="skillsJson"/>
+        <result column="experiences_json" property="experiencesJson"/>
+        <result column="certificates_json" property="certificatesJson"/>
+        <result column="innovation_summary" property="innovationSummary"/>
+        <result column="interest_summary" property="interestSummary"/>
+        <result column="personality_summary" property="personalitySummary"/>
+        <result column="ability_score" property="abilityScore"/>
+        <result column="competitiveness_score" property="competitivenessScore"/>
+        <result column="completeness_score" property="completenessScore"/>
+        <result column="resume_file_name" property="resumeFileName"/>
+        <result column="resume_storage_path" property="resumeStoragePath"/>
+        <result column="resume_content_type" property="resumeContentType"/>
+        <result column="parse_status" property="parseStatus"/>
+        <result column="parse_progress" property="parseProgress"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="StudentProfileColumns">
+        id,
+        user_id,
+        education_summary,
+        skills_json,
+        experiences_json,
+        certificates_json,
+        innovation_summary,
+        interest_summary,
+        personality_summary,
+        ability_score,
+        competitiveness_score,
+        completeness_score,
+        resume_file_name,
+        resume_storage_path,
+        resume_content_type,
+        parse_status,
+        parse_progress,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="findById" parameterType="long" resultMap="StudentProfileMap">
+        SELECT <include refid="StudentProfileColumns"/>
+        FROM student_profiles
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByUserId" parameterType="long" resultMap="StudentProfileMap">
+        SELECT <include refid="StudentProfileColumns"/>
+        FROM student_profiles
+        WHERE user_id = #{userId}
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.profile.entity.StudentProfileEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO student_profiles (
+            user_id,
+            education_summary,
+            skills_json,
+            experiences_json,
+            certificates_json,
+            innovation_summary,
+            interest_summary,
+            personality_summary,
+            ability_score,
+            competitiveness_score,
+            completeness_score,
+            resume_file_name,
+            resume_storage_path,
+            resume_content_type,
+            parse_status,
+            parse_progress
+        ) VALUES (
+            #{userId},
+            #{educationSummary},
+            #{skillsJson},
+            #{experiencesJson},
+            #{certificatesJson},
+            #{innovationSummary},
+            #{interestSummary},
+            #{personalitySummary},
+            #{abilityScore},
+            #{competitivenessScore},
+            #{completenessScore},
+            #{resumeFileName},
+            #{resumeStoragePath},
+            #{resumeContentType},
+            #{parseStatus},
+            #{parseProgress}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.profile.entity.StudentProfileEntity">
+        UPDATE student_profiles
+        SET education_summary = #{educationSummary},
+            skills_json = #{skillsJson},
+            experiences_json = #{experiencesJson},
+            certificates_json = #{certificatesJson},
+            innovation_summary = #{innovationSummary},
+            interest_summary = #{interestSummary},
+            personality_summary = #{personalitySummary},
+            ability_score = #{abilityScore},
+            competitiveness_score = #{competitivenessScore},
+            completeness_score = #{completenessScore},
+            resume_file_name = #{resumeFileName},
+            resume_storage_path = #{resumeStoragePath},
+            resume_content_type = #{resumeContentType},
+            parse_status = #{parseStatus},
+            parse_progress = #{parseProgress},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>

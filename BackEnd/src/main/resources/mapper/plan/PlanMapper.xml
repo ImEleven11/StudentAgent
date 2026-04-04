@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.plan.mapper.PlanMapper">
+
+    <resultMap id="PlanMap" type="com.uestc.studentagent.backend.plan.entity.PlanEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="profile_id" property="profileId"/>
+        <result column="target_job_id" property="targetJobId"/>
+        <result column="title" property="title"/>
+        <result column="summary" property="summary"/>
+        <result column="status" property="status"/>
+        <result column="progress" property="progress"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="PlanMap">
+        SELECT id, user_id, profile_id, target_job_id, title, summary, status, progress, created_at, updated_at
+        FROM plans
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByUserAndProfileId" resultMap="PlanMap">
+        SELECT id, user_id, profile_id, target_job_id, title, summary, status, progress, created_at, updated_at
+        FROM plans
+        WHERE user_id = #{userId}
+          AND profile_id = #{profileId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.plan.entity.PlanEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO plans (
+            user_id,
+            profile_id,
+            target_job_id,
+            title,
+            summary,
+            status,
+            progress
+        ) VALUES (
+            #{userId},
+            #{profileId},
+            #{targetJobId},
+            #{title},
+            #{summary},
+            #{status},
+            #{progress}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.plan.entity.PlanEntity">
+        UPDATE plans
+        SET title = #{title},
+            summary = #{summary},
+            status = #{status},
+            progress = #{progress},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM plans WHERE id = #{id}
+    </delete>
+
+</mapper>

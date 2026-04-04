@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.admin.mapper.SystemConfigMapper">
+
+    <resultMap id="SystemConfigMap" type="com.uestc.studentagent.backend.admin.entity.SystemConfigEntity">
+        <id column="config_key" property="configKey"/>
+        <result column="config_value" property="configValue"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findByKey" parameterType="string" resultMap="SystemConfigMap">
+        SELECT config_key, config_value, updated_at
+        FROM system_configs
+        WHERE config_key = #{configKey}
+    </select>
+
+    <insert id="insert" parameterType="com.uestc.studentagent.backend.admin.entity.SystemConfigEntity">
+        INSERT INTO system_configs (
+            config_key,
+            config_value
+        ) VALUES (
+            #{configKey},
+            #{configValue}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.admin.entity.SystemConfigEntity">
+        UPDATE system_configs
+        SET config_value = #{configValue},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE config_key = #{configKey}
+    </update>
+
+</mapper>

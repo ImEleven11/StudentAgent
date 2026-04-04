@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.plan.mapper.PlanTaskMapper">
+
+    <resultMap id="PlanTaskMap" type="com.uestc.studentagent.backend.plan.entity.PlanTaskEntity">
+        <id column="id" property="id"/>
+        <result column="plan_id" property="planId"/>
+        <result column="phase_name" property="phaseName"/>
+        <result column="task_title" property="taskTitle"/>
+        <result column="description" property="description"/>
+        <result column="recommended_days" property="recommendedDays"/>
+        <result column="completed" property="completed"/>
+        <result column="sort_order" property="sortOrder"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findByPlanId" parameterType="long" resultMap="PlanTaskMap">
+        SELECT id, plan_id, phase_name, task_title, description, recommended_days, completed, sort_order, created_at, updated_at
+        FROM plan_tasks
+        WHERE plan_id = #{planId}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="findById" parameterType="long" resultMap="PlanTaskMap">
+        SELECT id, plan_id, phase_name, task_title, description, recommended_days, completed, sort_order, created_at, updated_at
+        FROM plan_tasks
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.plan.entity.PlanTaskEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO plan_tasks (
+            plan_id,
+            phase_name,
+            task_title,
+            description,
+            recommended_days,
+            completed,
+            sort_order
+        ) VALUES (
+            #{planId},
+            #{phaseName},
+            #{taskTitle},
+            #{description},
+            #{recommendedDays},
+            #{completed},
+            #{sortOrder}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.plan.entity.PlanTaskEntity">
+        UPDATE plan_tasks
+        SET phase_name = #{phaseName},
+            task_title = #{taskTitle},
+            description = #{description},
+            recommended_days = #{recommendedDays},
+            completed = #{completed},
+            sort_order = #{sortOrder},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByPlanId" parameterType="long">
+        DELETE FROM plan_tasks WHERE plan_id = #{planId}
+    </delete>
+
+</mapper>

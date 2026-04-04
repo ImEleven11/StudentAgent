@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.report.mapper.ReportMapper">
+
+    <resultMap id="ReportMap" type="com.uestc.studentagent.backend.report.entity.ReportEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="profile_id" property="profileId"/>
+        <result column="target_job_id" property="targetJobId"/>
+        <result column="title" property="title"/>
+        <result column="content_json" property="contentJson"/>
+        <result column="polished_content" property="polishedContent"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="ReportMap">
+        SELECT id, user_id, profile_id, target_job_id, title, content_json, polished_content, created_at, updated_at
+        FROM reports
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByUserAndProfileId" resultMap="ReportMap">
+        SELECT id, user_id, profile_id, target_job_id, title, content_json, polished_content, created_at, updated_at
+        FROM reports
+        WHERE user_id = #{userId}
+          AND profile_id = #{profileId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.report.entity.ReportEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO reports (
+            user_id,
+            profile_id,
+            target_job_id,
+            title,
+            content_json,
+            polished_content
+        ) VALUES (
+            #{userId},
+            #{profileId},
+            #{targetJobId},
+            #{title},
+            #{contentJson},
+            #{polishedContent}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.report.entity.ReportEntity">
+        UPDATE reports
+        SET title = #{title},
+            content_json = #{contentJson},
+            polished_content = #{polishedContent},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>

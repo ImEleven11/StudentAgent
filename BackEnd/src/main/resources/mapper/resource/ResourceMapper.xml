@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.resource.mapper.ResourceMapper">
+
+    <resultMap id="ResourceMap" type="com.uestc.studentagent.backend.resource.entity.ResourceEntity">
+        <id column="id" property="id"/>
+        <result column="resource_type" property="resourceType"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="link" property="link"/>
+        <result column="skills_json" property="skillsJson"/>
+        <result column="level_tag" property="levelTag"/>
+        <result column="difficulty_tag" property="difficultyTag"/>
+        <result column="location_tag" property="locationTag"/>
+        <result column="category_tag" property="categoryTag"/>
+        <result column="time_range_tag" property="timeRangeTag"/>
+        <result column="duration_text" property="durationText"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="search" resultMap="ResourceMap">
+        SELECT id, resource_type, title, description, link, skills_json, level_tag, difficulty_tag,
+               location_tag, category_tag, time_range_tag, duration_text, created_at, updated_at
+        FROM resources
+        <where>
+            resource_type = #{resourceType}
+            <if test="levelTag != null and levelTag != ''">
+                AND level_tag = #{levelTag}
+            </if>
+            <if test="difficultyTag != null and difficultyTag != ''">
+                AND difficulty_tag = #{difficultyTag}
+            </if>
+            <if test="locationTag != null and locationTag != ''">
+                AND location_tag = #{locationTag}
+            </if>
+            <if test="categoryTag != null and categoryTag != ''">
+                AND category_tag = #{categoryTag}
+            </if>
+            <if test="timeRangeTag != null and timeRangeTag != ''">
+                AND time_range_tag = #{timeRangeTag}
+            </if>
+        </where>
+        ORDER BY updated_at DESC, id DESC
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.resource.entity.ResourceEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO resources (
+            resource_type,
+            title,
+            description,
+            link,
+            skills_json,
+            level_tag,
+            difficulty_tag,
+            location_tag,
+            category_tag,
+            time_range_tag,
+            duration_text
+        ) VALUES (
+            #{resourceType},
+            #{title},
+            #{description},
+            #{link},
+            #{skillsJson},
+            #{levelTag},
+            #{difficultyTag},
+            #{locationTag},
+            #{categoryTag},
+            #{timeRangeTag},
+            #{durationText}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.resource.entity.ResourceEntity">
+        UPDATE resources
+        SET resource_type = #{resourceType},
+            title = #{title},
+            description = #{description},
+            link = #{link},
+            skills_json = #{skillsJson},
+            level_tag = #{levelTag},
+            difficulty_tag = #{difficultyTag},
+            location_tag = #{locationTag},
+            category_tag = #{categoryTag},
+            time_range_tag = #{timeRangeTag},
+            duration_text = #{durationText},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <select id="findById" parameterType="long" resultMap="ResourceMap">
+        SELECT id, resource_type, title, description, link, skills_json, level_tag, difficulty_tag,
+               location_tag, category_tag, time_range_tag, duration_text, created_at, updated_at
+        FROM resources
+        WHERE id = #{id}
+    </select>
+
+</mapper>

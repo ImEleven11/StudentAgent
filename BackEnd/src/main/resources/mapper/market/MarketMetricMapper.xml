@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.market.mapper.MarketMetricMapper">
+
+    <resultMap id="MarketMetricMap" type="com.uestc.studentagent.backend.market.entity.MarketMetricEntity">
+        <id column="id" property="id"/>
+        <result column="job_id" property="jobId"/>
+        <result column="supply_demand_index" property="supplyDemandIndex"/>
+        <result column="level_tag" property="levelTag"/>
+        <result column="hot_score" property="hotScore"/>
+        <result column="demand_trend" property="demandTrend"/>
+        <result column="salary_trend" property="salaryTrend"/>
+        <result column="talent_gap" property="talentGap"/>
+        <result column="forecast_period" property="forecastPeriod"/>
+        <result column="forecast_result" property="forecastResult"/>
+        <result column="forecast_confidence" property="forecastConfidence"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findByJobId" parameterType="long" resultMap="MarketMetricMap">
+        SELECT id, job_id, supply_demand_index, level_tag, hot_score, demand_trend, salary_trend,
+               talent_gap, forecast_period, forecast_result, forecast_confidence, created_at, updated_at
+        FROM market_job_metrics
+        WHERE job_id = #{jobId}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findHotJobs" resultMap="MarketMetricMap">
+        SELECT id, job_id, supply_demand_index, level_tag, hot_score, demand_trend, salary_trend,
+               talent_gap, forecast_period, forecast_result, forecast_confidence, created_at, updated_at
+        FROM market_job_metrics
+        ORDER BY hot_score DESC, updated_at DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.user.mapper.UserMapper">
+
+    <resultMap id="UserEntityMap" type="com.uestc.studentagent.backend.user.entity.UserEntity">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="email" property="email"/>
+        <result column="password_hash" property="passwordHash"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar" property="avatar"/>
+        <result column="phone" property="phone"/>
+        <result column="role" property="role"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="UserColumns">
+        id,
+        username,
+        email,
+        password_hash,
+        nickname,
+        avatar,
+        phone,
+        role,
+        status,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="findById" parameterType="long" resultMap="UserEntityMap">
+        SELECT <include refid="UserColumns"/>
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByUsername" parameterType="string" resultMap="UserEntityMap">
+        SELECT <include refid="UserColumns"/>
+        FROM users
+        WHERE username = #{username}
+    </select>
+
+    <select id="findByEmail" parameterType="string" resultMap="UserEntityMap">
+        SELECT <include refid="UserColumns"/>
+        FROM users
+        WHERE email = #{email}
+    </select>
+
+    <select id="findByAccount" parameterType="string" resultMap="UserEntityMap">
+        SELECT <include refid="UserColumns"/>
+        FROM users
+        WHERE username = #{account}
+           OR email = #{account}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.uestc.studentagent.backend.user.entity.UserEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (
+            username,
+            email,
+            password_hash,
+            nickname,
+            avatar,
+            phone,
+            role,
+            status
+        ) VALUES (
+            #{username},
+            #{email},
+            #{passwordHash},
+            #{nickname},
+            #{avatar},
+            #{phone},
+            #{role},
+            #{status}
+        )
+    </insert>
+
+    <update id="updateProfile" parameterType="com.uestc.studentagent.backend.user.entity.UserEntity">
+        UPDATE users
+        SET nickname = #{nickname},
+            avatar = #{avatar},
+            phone = #{phone},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>

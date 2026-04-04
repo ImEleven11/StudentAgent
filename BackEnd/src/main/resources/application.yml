@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: student-agent-backend
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:student_agent}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+    neo4j:
+      uri: ${NEO4J_URI:bolt://localhost:7687}
+      authentication:
+        username: ${NEO4J_USERNAME:neo4j}
+        password: ${NEO4J_PASSWORD:neo4j123456}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.uestc.studentagent.backend.user.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+
+app:
+  security:
+    jwt:
+      issuer: student-agent-backend
+      secret: ${JWT_SECRET:ChangeThisSecretBeforeProductionUse1234567890}
+      access-token-ttl-minutes: 120
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+  storage:
+    local-root: ${LOCAL_STORAGE_ROOT:./data}
+  integration:
+    ml:
+      profile-service-base-url: ${ML_PROFILE_SERVICE_URL:http://localhost:9001}
+      matching-service-base-url: ${ML_MATCHING_SERVICE_URL:http://localhost:9002}
+      planning-service-base-url: ${ML_PLANNING_SERVICE_URL:http://localhost:9003}

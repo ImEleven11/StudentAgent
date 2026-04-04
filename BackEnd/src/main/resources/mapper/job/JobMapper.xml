@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.job.mapper.JobMapper">
+
+    <resultMap id="JobMap" type="com.uestc.studentagent.backend.job.entity.JobEntity">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="industry" property="industry"/>
+        <result column="location" property="location"/>
+        <result column="salary_min" property="salaryMin"/>
+        <result column="salary_max" property="salaryMax"/>
+        <result column="description" property="description"/>
+        <result column="skills_json" property="skillsJson"/>
+        <result column="portrait_summary" property="portraitSummary"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="JobColumns">
+        id,
+        title,
+        industry,
+        location,
+        salary_min,
+        salary_max,
+        description,
+        skills_json,
+        portrait_summary,
+        created_at,
+        updated_at
+    </sql>
+
+    <select id="findById" parameterType="long" resultMap="JobMap">
+        SELECT <include refid="JobColumns"/>
+        FROM jobs
+        WHERE id = #{id}
+    </select>
+
+    <select id="search" resultMap="JobMap">
+        SELECT <include refid="JobColumns"/>
+        FROM jobs
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="industry != null and industry != ''">
+                AND industry = #{industry}
+            </if>
+            <if test="location != null and location != ''">
+                AND location = #{location}
+            </if>
+        </where>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countSearch" resultType="long">
+        SELECT COUNT(1)
+        FROM jobs
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="industry != null and industry != ''">
+                AND industry = #{industry}
+            </if>
+            <if test="location != null and location != ''">
+                AND location = #{location}
+            </if>
+        </where>
+    </select>
+
+    <select id="findAll" resultMap="JobMap">
+        SELECT <include refid="JobColumns"/>
+        FROM jobs
+        ORDER BY updated_at DESC, id DESC
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.job.entity.JobEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO jobs (
+            title,
+            industry,
+            location,
+            salary_min,
+            salary_max,
+            description,
+            skills_json,
+            portrait_summary
+        ) VALUES (
+            #{title},
+            #{industry},
+            #{location},
+            #{salaryMin},
+            #{salaryMax},
+            #{description},
+            #{skillsJson},
+            #{portraitSummary}
+        )
+    </insert>
+
+</mapper>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.uestc.studentagent.backend.assessment.mapper.AssessmentMapper">
+
+    <resultMap id="AssessmentMap" type="com.uestc.studentagent.backend.assessment.entity.AssessmentEntity">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="plan_id" property="planId"/>
+        <result column="assessment_type" property="assessmentType"/>
+        <result column="status" property="status"/>
+        <result column="questions_json" property="questionsJson"/>
+        <result column="answers_json" property="answersJson"/>
+        <result column="result_json" property="resultJson"/>
+        <result column="adjustment_suggestions_json" property="adjustmentSuggestionsJson"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="AssessmentMap">
+        SELECT id, user_id, plan_id, assessment_type, status, questions_json, answers_json, result_json,
+               adjustment_suggestions_json, created_at, updated_at
+        FROM assessments
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByPlanId" parameterType="long" resultMap="AssessmentMap">
+        SELECT id, user_id, plan_id, assessment_type, status, questions_json, answers_json, result_json,
+               adjustment_suggestions_json, created_at, updated_at
+        FROM assessments
+        WHERE plan_id = #{planId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <insert id="insert"
+            parameterType="com.uestc.studentagent.backend.assessment.entity.AssessmentEntity"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO assessments (
+            user_id,
+            plan_id,
+            assessment_type,
+            status,
+            questions_json,
+            answers_json,
+            result_json,
+            adjustment_suggestions_json
+        ) VALUES (
+            #{userId},
+            #{planId},
+            #{assessmentType},
+            #{status},
+            #{questionsJson},
+            #{answersJson},
+            #{resultJson},
+            #{adjustmentSuggestionsJson}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.uestc.studentagent.backend.assessment.entity.AssessmentEntity">
+        UPDATE assessments
+        SET status = #{status},
+            questions_json = #{questionsJson},
+            answers_json = #{answersJson},
+            result_json = #{resultJson},
+            adjustment_suggestions_json = #{adjustmentSuggestionsJson},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+</mapper>
