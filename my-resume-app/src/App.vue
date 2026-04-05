@@ -1,403 +1,366 @@
 ﻿<template>
-  <div class="app-shell">
+  <div class="app-container">
     <aside class="sidebar">
-      <div class="sidebar-card brand-card">
-        <p class="eyebrow">StudentAgent</p>
-        <h1>前后端对齐工作台</h1>
-        <p>认证、画像、聊天、规划与归档已经按后端模块拆分接入。</p>
-      </div>
+      <div class="logo">简历 AI 助手</div>
 
-      <div class="sidebar-card">
-        <strong>{{ isAuthenticated ? displayName : '未登录' }}</strong>
-        <p>{{ isAuthenticated ? currentUser?.email : '请先登录后再调用受保护接口' }}</p>
-      </div>
+      <section class="auth-card">
+        <template v-if="!isAuthenticated">
+          <div class="auth-toggle">
+            <button :class="['auth-toggle-btn', authMode === 'login' ? 'active' : '']" @click="authMode = 'login'">登录</button>
+            <button :class="['auth-toggle-btn', authMode === 'register' ? 'active' : '']" @click="authMode = 'register'">注册</button>
+          </div>
 
-      <nav class="nav-list">
-        <button
-          v-for="item in navigationItems"
-          :key="item.key"
-          type="button"
-          class="nav-button"
-          :class="{ active: currentTab === item.key }"
-          :disabled="item.requiresAuth && !isAuthenticated"
-          @click="currentTab = item.key"
-        >
-          {{ item.label }}
-        </button>
+          <form class="auth-form" @submit.prevent="handleAuthSubmit">
+            <input v-if="authMode === 'register'" v-model.trim="authForm.username" type="text" placeholder="用户名" />
+            <input v-if="authMode === 'register'" v-model.trim="authForm.email" type="email" placeholder="邮箱" />
+            <input v-else v-model.trim="authForm.account" type="text" placeholder="用户名或邮箱" />
+            <input v-model="authForm.password" type="password" placeholder="密码" />
+            <button class="primary-btn" type="submit" :disabled="authLoading || loading.bootstrap">
+              {{ authLoading ? '处理中...' : authMode === 'login' ? '登录' : '注册并登录' }}
+            </button>
+          </form>
+        </template>
+
+        <template v-else>
+          <div class="auth-user">
+            <strong>{{ currentUser?.nickname || currentUser?.username }}</strong>
+            <p>{{ currentUser?.email }}</p>
+            <small v-if="currentProfile">画像完整度 {{ formatPercent(currentProfile.completenessScore) }}</small>
+          </div>
+          <button class="secondary-btn" type="button" @click="handleLogout" :disabled="authLoading">
+            {{ authLoading ? '退出中...' : '退出登录' }}
+          </button>
+        </template>
+      </section>
+
+      <nav>
+        <div :class="['nav-item', currentTab === 'upload' ? 'active' : '']" @click="currentTab = 'upload'">简历上传</div>
+        <div :class="['nav-item', currentTab === 'chat' ? 'active' : '']" @click="currentTab = 'chat'">AI 深度对话</div>
+        <div :class="['nav-item', currentTab === 'report' ? 'active' : '']" @click="currentTab = 'report'">职业晋升路径</div>
+        <div :class="['nav-item', currentTab === 'archive' ? 'active' : '']" @click="currentTab = 'archive'">个人档案库</div>
       </nav>
 
-      <div v-if="studentProfile" class="sidebar-card metrics-grid">
+      <div class="sidebar-summary" v-if="currentProfile">
         <div>
-          <span>完整度</span>
-          <strong>{{ formatPercent(studentProfile.completenessScore) }}</strong>
+          <span>解析进度</span>
+          <strong>{{ currentProfile.parseProgress ?? 0 }}%</strong>
         </div>
         <div>
-          <span>能力值</span>
-          <strong>{{ formatPercent(studentProfile.abilityScore) }}</strong>
-        </div>
-        <div>
-          <span>竞争力</span>
-          <strong>{{ formatPercent(studentProfile.competitivenessScore) }}</strong>
+          <span>缺失字段</span>
+          <strong>{{ currentProfile.missingFields?.length || 0 }}</strong>
         </div>
       </div>
+
+      <div class="user-info">服务创新大赛项目</div>
     </aside>
 
-    <main class="main-panel">
-      <header class="page-header">
-        <div>
-          <p class="eyebrow">架构一致性</p>
-          <h2>{{ tabMeta[currentTab].title }}</h2>
-          <p>{{ tabMeta[currentTab].description }}</p>
-        </div>
-        <div class="header-actions">
-          <button type="button" class="button secondary" @click="refreshJobSearch" :disabled="loading.jobs">
-            {{ loading.jobs ? '刷新中...' : '刷新岗位' }}
-          </button>
-          <button v-if="isAuthenticated" type="button" class="button ghost" @click="handleLogout" :disabled="loading.auth">
-            退出登录
-          </button>
-        </div>
+    <main class="main-content">
+      <header class="top-bar">
+        <span>当前功能：{{ tabNames[currentTab] }}</span>
+        <span>{{ topBarStatus }}</span>
       </header>
 
-      <div v-if="statusBanner.text" class="notice" :class="statusBanner.type">{{ statusBanner.text }}</div>
+      <div v-if="notice.text" :class="['notice', notice.type]">{{ notice.text }}</div>
 
-      <section v-if="!isAuthenticated || currentTab === 'auth'" class="grid two">
-        <article class="card">
-          <div class="card-head">
-            <h3>{{ isAuthenticated ? '账户资料' : authMode === 'login' ? '登录' : '注册' }}</h3>
-            <div v-if="!isAuthenticated" class="switch-row">
-              <button type="button" class="mini-button" :class="{ active: authMode === 'login' }" @click="authMode = 'login'">登录</button>
-              <button type="button" class="mini-button" :class="{ active: authMode === 'register' }" @click="authMode = 'register'">注册</button>
+      <section v-if="currentTab === 'upload'" class="content-body">
+        <div class="welcome-text">
+          <h1>你好！我是你的职业规划 AI</h1>
+          <p>上传简历后，我会读取后端画像、推荐岗位、阶段化计划和报告数据，让后续页面真正联动起来。</p>
+        </div>
+
+        <div class="upload-zone">
+          <div class="upload-card">
+            <div class="icon">📨</div>
+            <h3>点击或拖拽简历到这里</h3>
+            <p>支持 PDF、Word 格式</p>
+            <p class="upload-hint">{{ isAuthenticated ? '登录后将直接上传到后端画像模块，并同步到后续页面。' : '请先登录后再上传。' }}</p>
+            <input type="file" class="hidden-input" accept=".pdf,.doc,.docx" @change="handleUpload" />
+          </div>
+        </div>
+
+        <div v-if="uploadedResumeName" class="status-card">
+          <strong>最近上传：</strong>
+          <span>{{ uploadedResumeName }}</span>
+        </div>
+
+        <div v-if="currentProfile" class="profile-overview-grid">
+          <div class="overview-card">
+            <span>简历解析状态</span>
+            <strong>{{ currentProfile.parseStatus }}</strong>
+            <p>当前进度 {{ currentProfile.parseProgress ?? 0 }}%</p>
+          </div>
+          <div class="overview-card">
+            <span>画像完整度</span>
+            <strong>{{ formatPercent(currentProfile.completenessScore) }}</strong>
+            <p>{{ currentProfile.missingFields?.length ? `仍缺少 ${currentProfile.missingFields.length} 项信息` : '画像信息已较完整' }}</p>
+          </div>
+          <div class="overview-card">
+            <span>推荐岗位</span>
+            <strong>{{ recommendedJobs[0]?.jobTitle || '待生成' }}</strong>
+            <p>{{ recommendedJobs[0]?.industry || '上传后自动联动匹配结果' }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="currentTab === 'chat'" class="chat-body">
+        <div v-if="!isAuthenticated" class="empty-state">
+          <h3>请先登录</h3>
+          <p>登录后才会恢复账户下的画像、报告与对话状态。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">返回首页</button>
+        </div>
+
+        <div v-else-if="!isUploaded" class="empty-state">
+          <h3>请先上传简历</h3>
+          <p>上传成功后，这里会接入真实聊天接口，并结合你的画像内容继续对话。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">去上传</button>
+        </div>
+
+        <template v-else>
+          <div class="chat-meta-row">
+            <div class="meta-chip">画像ID #{{ activeProfileId || '--' }}</div>
+            <div class="meta-chip">会话 {{ chatSessionId || '未建立' }}</div>
+            <div class="meta-chip">推荐岗位 {{ recommendedJobs[0]?.jobTitle || '待推荐' }}</div>
+          </div>
+
+          <div class="chat-window" ref="chatWindow">
+            <div v-for="(msg, index) in messages" :key="`${msg.role}-${index}-${msg.text}`" :class="['message-row', msg.role]">
+              <div class="bubble">{{ msg.text }}</div>
+            </div>
+            <div v-if="loading.chat" class="message-row ai">
+              <div class="bubble loading-bubble">AI 正在读取你的画像并整理回复...</div>
             </div>
           </div>
 
-          <form v-if="!isAuthenticated" class="form-stack" @submit.prevent="handleAuthSubmit">
-            <label v-if="authMode === 'register'"><span>用户名</span><input v-model.trim="authForm.username" type="text" placeholder="4-32 位用户名" /></label>
-            <label v-if="authMode === 'register'"><span>邮箱</span><input v-model.trim="authForm.email" type="email" placeholder="you@example.com" /></label>
-            <label v-else><span>账号</span><input v-model.trim="authForm.account" type="text" placeholder="用户名或邮箱" /></label>
-            <label><span>密码</span><input v-model="authForm.password" type="password" placeholder="至少 8 位" /></label>
-            <button type="submit" class="button primary" :disabled="loading.auth">
-              {{ loading.auth ? '提交中...' : authMode === 'login' ? '登录并保存 Token' : '注册并自动登录' }}
-            </button>
-          </form>
-
-          <form v-else class="form-stack" @submit.prevent="handleUserProfileSave">
-            <label><span>用户名</span><input :value="currentUser?.username || ''" type="text" disabled /></label>
-            <label><span>邮箱</span><input :value="currentUser?.email || ''" type="email" disabled /></label>
-            <label><span>昵称</span><input v-model.trim="userProfileForm.nickname" type="text" placeholder="展示名称" /></label>
-            <label><span>头像地址</span><input v-model.trim="userProfileForm.avatar" type="text" placeholder="https://..." /></label>
-            <label><span>手机号</span><input v-model.trim="userProfileForm.phone" type="text" placeholder="用于完善个人资料" /></label>
-            <button type="submit" class="button primary" :disabled="loading.user">{{ loading.user ? '保存中...' : '保存资料' }}</button>
-          </form>
-        </article>
-
-        <article class="card">
-          <h3>已接入的接口约束</h3>
-          <div class="list-block">
-            <div class="list-item"><strong>统一解包</strong><p>所有接口通过 `code / message / data` 解包并统一处理异常。</p></div>
-            <div class="list-item"><strong>本地会话恢复</strong><p>JWT、画像 ID、聊天会话 ID 分别保存，刷新页面后仍可恢复上下文。</p></div>
-            <div class="list-item"><strong>独立 API 模块</strong><p>`auth / profile / chat / job / match / plan / report` 已分文件维护。</p></div>
+          <div class="chat-input-area">
+            <input v-model="userInput" type="text" placeholder="补充你的项目、技能、目标岗位或求职顾虑..." @keyup.enter="sendMessage" />
+            <button @click="sendMessage" class="send-btn" :disabled="loading.chat">发送</button>
+            <button @click="handleClearChat" class="secondary-inline-btn" :disabled="loading.chat">清空会话</button>
+            <button @click="startAnalysis" class="analyze-btn" :disabled="isAnalyzing || loading.report">生成真实报告</button>
           </div>
-          <h3 class="top-gap">岗位接口预览</h3>
-          <div class="list-block">
-            <div v-for="job in jobResults.slice(0, 4)" :key="job.jobId" class="list-item">
-              <strong>{{ job.title }}</strong>
-              <p>{{ job.industry }} · {{ job.location }}</p>
+        </template>
+
+        <div v-if="isAnalyzing" class="progress-mask">
+          <div class="progress-box">
+            <p>正在联动后端生成报告与成长计划...</p>
+            <div class="progress-bar-container">
+              <div class="progress-bar" :style="{ width: analysisProgress + '%' }"></div>
             </div>
-            <div v-if="!jobResults.length" class="empty-box">后端启动后会通过 `/api/job/search` 拉取岗位数据。</div>
+            <p>{{ analysisProgress }}%</p>
           </div>
-        </article>
+        </div>
       </section>
 
-      <section v-if="isAuthenticated && currentTab === 'profile'" class="grid two">
-        <article class="card">
-          <h3>上传简历</h3>
-          <label class="upload-box">
-            <input type="file" accept=".pdf,.doc,.docx" @change="handleResumeUpload" />
-            <span>点击上传 PDF / Word 简历，调用 `/api/profile/upload-resume`</span>
-          </label>
-          <p class="meta-text">文件：{{ studentProfile?.resumeFileName || '未上传' }}</p>
-          <p class="meta-text">状态：{{ studentProfile?.parseStatus || 'WAITING' }}<span v-if="studentProfile"> · {{ studentProfile.parseProgress }}%</span></p>
-        </article>
+      <section v-if="currentTab === 'report'" class="report-body">
+        <div v-if="!isAuthenticated" class="empty-state">
+          <h3>请先登录后再查看报告</h3>
+          <p>登录后才能读取账户下的真实职业报告和计划。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">返回首页</button>
+        </div>
 
-        <article class="card">
-          <h3>学生画像表单</h3>
-          <form class="form-stack" @submit.prevent="handleProfileSubmit">
-            <label><span>教育背景</span><textarea v-model.trim="profileForm.educationSummary" rows="3" placeholder="专业、课程、方向"></textarea></label>
-            <label><span>技能清单</span><textarea v-model.trim="profileForm.skillsText" rows="3" placeholder="每行一项或逗号分隔"></textarea></label>
-            <label><span>项目 / 实习经历</span><textarea v-model.trim="profileForm.experiencesText" rows="3" placeholder="每行一项经历"></textarea></label>
-            <label><span>证书 / 荣誉</span><textarea v-model.trim="profileForm.certificatesText" rows="3" placeholder="证书、奖项、竞赛"></textarea></label>
-            <label><span>创新能力</span><textarea v-model.trim="profileForm.innovationSummary" rows="3" placeholder="科研、作品、竞赛成果"></textarea></label>
-            <label><span>兴趣方向</span><textarea v-model.trim="profileForm.interestSummary" rows="2" placeholder="偏好的行业或岗位"></textarea></label>
-            <label><span>性格特征</span><textarea v-model.trim="profileForm.personalitySummary" rows="2" placeholder="协作方式、执行风格"></textarea></label>
-            <button type="submit" class="button primary" :disabled="loading.profile">
-              {{ loading.profile ? '保存中...' : studentProfile ? '更新画像' : '创建画像' }}
-            </button>
-          </form>
-        </article>
+        <div v-else-if="!isUploaded" class="empty-state">
+          <h3>请先在首页上传您的简历</h3>
+          <p>上传完成后，报告页会展示真实的画像、岗位推荐、报告章节与计划任务。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">去上传</button>
+        </div>
 
-        <article class="card">
-          <h3>画像概览</h3>
-          <div v-if="studentProfile" class="list-block">
-            <div class="list-item"><strong>画像 ID</strong><p>#{{ studentProfile.profileId }}</p></div>
-            <div class="list-item"><strong>创建时间</strong><p>{{ formatDate(studentProfile.createdAt) }}</p></div>
-            <div class="list-item"><strong>更新时间</strong><p>{{ formatDate(studentProfile.updatedAt) }}</p></div>
+        <div v-else class="report-shell">
+          <div class="report-header-block">
+            <h2>{{ activeReport?.title || '职业晋升路径规划' }}</h2>
+            <div class="report-actions">
+              <button class="nav-btn" @click="startAnalysis" :disabled="isAnalyzing || loading.report">{{ activeReport ? '重新生成报告' : '生成报告' }}</button>
+              <button class="secondary-inline-btn" @click="openLatestReport" :disabled="!reportItems.length || loading.report">刷新最新报告</button>
+            </div>
           </div>
-          <div v-else class="empty-box">先上传简历或填写画像表单。</div>
-        </article>
 
-        <article class="card">
-          <h3>待补全字段</h3>
-          <div class="tag-list">
-            <span v-for="field in missingFields" :key="field" class="tag warning">{{ field }}</span>
-            <span v-if="!missingFields.length" class="tag success">画像已完整</span>
+          <div class="path-container">
+            <div class="path-node">已上传简历</div>
+            <div class="arrow">→</div>
+            <div class="path-node active">{{ recommendedJobs[0]?.jobTitle || '推荐岗位待生成' }}</div>
+            <div class="arrow">→</div>
+            <div class="path-node">阶段化成长与求职投递</div>
           </div>
-        </article>
-      </section>
 
-      <section v-if="isAuthenticated && currentTab === 'chat'" class="grid chat-layout">
-        <article class="card">
-          <div class="card-head">
-            <h3>智能对话</h3>
-            <button type="button" class="button ghost" @click="handleClearChat" :disabled="!chatSessionId || loading.chat">清空会话</button>
+          <div class="report-metric-grid" v-if="currentProfile">
+            <div class="metric-card">
+              <span>能力值</span>
+              <strong>{{ formatPercent(currentProfile.abilityScore) }}</strong>
+            </div>
+            <div class="metric-card">
+              <span>竞争力</span>
+              <strong>{{ formatPercent(currentProfile.competitivenessScore) }}</strong>
+            </div>
+            <div class="metric-card">
+              <span>完整度</span>
+              <strong>{{ formatPercent(currentProfile.completenessScore) }}</strong>
+            </div>
           </div>
-          <div class="chat-box">
-            <div v-for="message in chatMessages" :key="message.id || `${message.role}-${message.createdAt || message.content}`" class="message-row" :class="message.role?.toLowerCase()">
-              <div class="message-bubble">
-                <strong>{{ message.role?.toLowerCase() === 'user' ? '你' : 'AI' }}</strong>
-                <p>{{ message.content }}</p>
+
+          <div v-if="!activeReport" class="empty-state inline-empty-state">
+            <h3>还没有生成真实报告</h3>
+            <p>你已经完成上传，可以直接点击上方按钮生成报告，系统会同时刷新推荐岗位和成长计划。</p>
+          </div>
+
+          <div v-else class="insight-grid">
+            <article class="insight-card">
+              <h3>报告章节</h3>
+              <div class="section-list">
+                <div v-for="section in activeReport.sections" :key="section.title" class="section-item">
+                  <strong>{{ section.title }}</strong>
+                  <p>{{ section.content }}</p>
+                </div>
               </div>
-            </div>
-          </div>
-          <form class="form-stack top-gap" @submit.prevent="handleSendMessage">
-            <textarea v-model.trim="chatInput" rows="3" placeholder="聊聊目标岗位、技能差距或下一步计划..."></textarea>
-            <button type="submit" class="button primary" :disabled="loading.chat || !chatInput.trim()">{{ loading.chat ? '发送中...' : '发送消息' }}</button>
-          </form>
-        </article>
+            </article>
 
-        <article class="card">
-          <h3>上下文状态</h3>
-          <div class="list-block">
-            <div class="list-item"><strong>当前画像</strong><p>{{ studentProfile ? `#${studentProfile.profileId}` : '未创建' }}</p></div>
-            <div class="list-item"><strong>会话 ID</strong><p>{{ chatSessionId || '未创建' }}</p></div>
-            <div class="list-item"><strong>待补字段</strong><p>{{ missingFields.length ? missingFields.join('、') : '无' }}</p></div>
-          </div>
-        </article>
-      </section>
-
-      <section v-if="isAuthenticated && currentTab === 'planning'" class="grid two">
-        <article class="card">
-          <h3>岗位搜索</h3>
-          <form class="search-row" @submit.prevent="refreshJobSearch">
-            <input v-model.trim="jobSearchForm.keyword" type="text" placeholder="关键词" />
-            <input v-model.trim="jobSearchForm.industry" type="text" placeholder="行业" />
-            <input v-model.trim="jobSearchForm.location" type="text" placeholder="城市" />
-            <button type="submit" class="button secondary" :disabled="loading.jobs">搜索</button>
-          </form>
-          <div class="list-block">
-            <button v-for="job in jobResults" :key="job.jobId" type="button" class="select-card" :class="{ active: selectedJobId === job.jobId }" @click="handleSelectJob(job.jobId)">
-              <strong>{{ job.title }}</strong>
-              <p>{{ job.industry }} · {{ job.location }} · {{ formatSalaryRange(job.salaryMin, job.salaryMax) }}</p>
-            </button>
-            <div v-if="!jobResults.length" class="empty-box">暂无岗位数据。</div>
-          </div>
-        </article>
-
-        <article class="card">
-          <div class="card-head">
-            <h3>推荐与匹配</h3>
-            <button type="button" class="button ghost" @click="refreshRecommendations" :disabled="loading.recommend || !studentProfile">{{ loading.recommend ? '计算中...' : '刷新推荐' }}</button>
-          </div>
-          <div class="tag-list">
-            <button v-for="job in recommendedJobs" :key="job.jobId" type="button" class="tag button-tag" :class="{ active: selectedJobId === job.jobId }" @click="handleSelectJob(job.jobId)">
-              {{ job.jobTitle }} · {{ formatPercent(job.matchScore) }}
-            </button>
-          </div>
-          <div v-if="selectedJobDetail" class="list-item top-gap">
-            <strong>{{ selectedJobDetail.title }}</strong>
-            <p>{{ selectedJobDetail.description }}</p>
-          </div>
-          <div v-if="matchInsight" class="list-block top-gap">
-            <div class="list-item"><strong>综合匹配</strong><p>{{ formatPercent(matchInsight.overallScore) }}</p></div>
-            <div class="list-item"><strong>技能匹配</strong><p>{{ formatPercent(matchInsight.skillScore) }}</p></div>
-            <div class="list-item"><strong>建议</strong><p>{{ matchInsight.summary }}</p></div>
-          </div>
-        </article>
-
-        <article class="card">
-          <h3>路径、计划与报告</h3>
-          <div v-if="selectedJobPath" class="list-block">
-            <div v-for="node in selectedJobPath.promotionPaths" :key="`promotion-${node.targetJobId}-${node.stepOrder}`" class="list-item">
-              <strong>晋升 {{ node.stepOrder }} · {{ node.targetJobTitle }}</strong>
-              <p>{{ node.description }}</p>
-            </div>
-            <div v-for="node in selectedJobPath.transitionPaths" :key="`transition-${node.targetJobId}-${node.stepOrder}`" class="list-item">
-              <strong>转岗 {{ node.stepOrder }} · {{ node.targetJobTitle }}</strong>
-              <p>{{ node.description }}</p>
-            </div>
-          </div>
-          <div v-else class="empty-box">选择一个岗位后会加载职业路径。</div>
-          <div class="action-row top-gap">
-            <button type="button" class="button primary" @click="handleGeneratePlan" :disabled="loading.plan || !studentProfile">{{ loading.plan ? '生成中...' : '生成阶段计划' }}</button>
-            <button type="button" class="button secondary" @click="handleGenerateReport" :disabled="loading.report || !studentProfile">{{ loading.report ? '生成中...' : '生成报告' }}</button>
-          </div>
-          <div v-if="activePlan" class="list-block top-gap">
-            <div v-for="task in activePlan.tasks" :key="task.taskId" class="task-row">
-              <div>
-                <strong>{{ task.phaseName }} · {{ task.taskTitle }}</strong>
-                <p>{{ task.description }}</p>
+            <article class="insight-card">
+              <h3>推荐岗位</h3>
+              <div class="recommend-list">
+                <button v-for="job in recommendedJobs" :key="job.jobId" type="button" class="recommend-item" @click="startAnalysis(job.jobId)">
+                  <strong>{{ job.jobTitle }}</strong>
+                  <p>{{ job.industry }} · {{ job.location }}</p>
+                  <span>匹配度 {{ formatPercent(job.matchScore) }}</span>
+                </button>
+                <div v-if="!recommendedJobs.length" class="archive-item empty">暂无推荐岗位</div>
               </div>
-              <button type="button" class="button ghost" :disabled="task.completed || loading.plan" @click="handleCompleteTask(task.taskId)">
-                {{ task.completed ? '已完成' : '完成任务' }}
-              </button>
-            </div>
-          </div>
-        </article>
+            </article>
 
-        <PlanningInsightPanel
-          :student-profile="studentProfile"
-          :active-plan="activePlan"
-          :selected-job-id="selectedJobId"
-          :selected-job-detail="selectedJobDetail"
-          @plan-adjusted="handlePlanAdjusted"
-          @notice="handleInsightNotice"
-        />
+            <article class="insight-card">
+              <h3>阶段化计划</h3>
+              <div v-if="activePlan" class="task-list">
+                <div class="plan-summary">{{ activePlan.summary }}</div>
+                <div v-for="task in activePlan.tasks" :key="task.taskId" class="task-item" :class="task.completed ? 'done' : ''">
+                  <strong>{{ task.phaseName }} · {{ task.taskTitle }}</strong>
+                  <p>{{ task.description }}</p>
+                  <span>{{ task.recommendedDays }} 天</span>
+                </div>
+              </div>
+              <div v-else class="archive-item empty">系统尚未生成计划</div>
+            </article>
+          </div>
+        </div>
       </section>
 
-      <section v-if="isAuthenticated && currentTab === 'archive'" class="grid archive-layout">
-        <article class="card">
-          <h3>历史计划</h3>
-          <div class="list-block">
-            <button v-for="plan in planItems" :key="plan.planId" type="button" class="select-card" :class="{ active: activePlan?.planId === plan.planId }" @click="openPlan(plan.planId)">
-              <strong>{{ plan.title }}</strong>
-              <p>{{ formatPercent(plan.progress) }} · {{ plan.status }}</p>
-            </button>
-            <div v-if="!planItems.length" class="empty-box">暂无历史计划。</div>
-          </div>
-        </article>
+      <section v-if="currentTab === 'archive'" class="content-body archive-body">
+        <div v-if="!isAuthenticated" class="empty-state">
+          <h3>请先登录</h3>
+          <p>档案库会展示真实报告、成长计划和当前画像状态。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">返回首页</button>
+        </div>
 
-        <article class="card">
-          <h3>历史报告</h3>
-          <div class="list-block">
-            <button v-for="report in reportItems" :key="report.reportId" type="button" class="select-card" :class="{ active: activeReport?.reportId === report.reportId }" @click="openReport(report.reportId)">
-              <strong>{{ report.title }}</strong>
-              <p>{{ formatDate(report.createdAt) }}</p>
-            </button>
-            <div v-if="!reportItems.length" class="empty-box">暂无历史报告。</div>
-          </div>
-        </article>
+        <div v-else-if="!isUploaded" class="empty-state">
+          <h3>暂无可归档内容</h3>
+          <p>先上传简历并生成报告，档案库才会逐步丰富起来。</p>
+          <button @click="currentTab = 'upload'" class="nav-btn">去上传</button>
+        </div>
 
-        <article class="card">
-          <div class="card-head">
-            <h3>{{ activeReport ? activeReport.title : '报告详情' }}</h3>
-            <div class="header-actions">
-              <button type="button" class="button ghost" @click="handlePolishReport" :disabled="!activeReport || loading.polish">{{ loading.polish ? '润色中...' : '智能润色' }}</button>
-              <button type="button" class="button secondary" @click="handleExportReport('pdf')" :disabled="!activeReport || loading.export">导出 PDF</button>
-              <button type="button" class="button secondary" @click="handleExportReport('word')" :disabled="!activeReport || loading.export">导出 Word</button>
-            </div>
+        <template v-else>
+          <h2>已保存的分析记录</h2>
+          <div class="archive-grid">
+            <article class="archive-panel">
+              <h3>职业报告</h3>
+              <div class="archive-list">
+                <button v-for="report in reportItems" :key="report.reportId" type="button" class="archive-item action-item" @click="openReport(report.reportId)">
+                  <strong>{{ report.title }}</strong>
+                  <p>{{ formatDate(report.createdAt) }}</p>
+                </button>
+                <div v-if="!reportItems.length" class="archive-item empty">暂无报告</div>
+              </div>
+            </article>
+
+            <article class="archive-panel">
+              <h3>阶段计划</h3>
+              <div class="archive-list">
+                <button v-for="plan in planItems" :key="plan.planId" type="button" class="archive-item action-item" @click="openPlan(plan)">
+                  <strong>{{ plan.title }}</strong>
+                  <p>进度 {{ formatPercent(plan.progress) }}</p>
+                </button>
+                <div v-if="!planItems.length" class="archive-item empty">暂无计划</div>
+              </div>
+            </article>
+
+            <article class="archive-panel">
+              <h3>当前画像</h3>
+              <div v-if="currentProfile" class="profile-panel">
+                <p><strong>简历：</strong>{{ currentProfile.resumeFileName || '未上传' }}</p>
+                <p><strong>技能：</strong>{{ currentProfile.skills?.length || 0 }} 项</p>
+                <p><strong>经历：</strong>{{ currentProfile.experiences?.length || 0 }} 条</p>
+                <p><strong>缺失：</strong>{{ currentProfile.missingFields?.join('、') || '无' }}</p>
+              </div>
+            </article>
           </div>
-          <div v-if="activeReport" class="list-block">
-            <div v-for="section in activeReport.sections" :key="section.title" class="list-item">
-              <strong>{{ section.title }}</strong>
-              <p>{{ section.content }}</p>
-            </div>
-            <div v-if="activeReport.polishedContent" class="list-item highlight-box">
-              <strong>润色后的整合文本</strong>
-              <p>{{ activeReport.polishedContent }}</p>
-            </div>
-          </div>
-          <div v-else class="empty-box">选择一份报告后查看详情。</div>
-        </article>
+        </template>
       </section>
     </main>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { getCurrentUserProfile, loginUser, logoutUser, registerUser, updateCurrentUserProfile } from './api/modules/auth'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { getCurrentUserProfile, loginUser, logoutUser, registerUser } from './api/modules/auth'
 import { clearChatHistory, getChatHistory, sendChatMessage } from './api/modules/chat'
-import { getJobDetail, getJobPath, searchJobs } from './api/modules/job'
-import { analyzeMatch, recommendJobs } from './api/modules/match'
-import { completePlanTask, generatePlan, getPlan, listPlans } from './api/modules/plan'
-import { completeStudentProfile, createProfileByManualInput, getProfileMissingFields, getStudentProfile, updateStudentProfile, uploadResumeFile } from './api/modules/profile'
-import { exportGeneratedReport, generateReport, getReport, listReports, polishGeneratedReport } from './api/modules/report'
+import { recommendJobs } from './api/modules/match'
+import { generatePlan, getPlan, listPlans } from './api/modules/plan'
+import { getStudentProfile, uploadResumeFile } from './api/modules/profile'
+import { generateReport, getReport, listReports } from './api/modules/report'
 import { clearClientSession, clearStoredChatSessionId, getAccessToken, getActiveProfileId, getChatSessionId, setActiveProfileId, setChatSessionId } from './api/session'
-import PlanningInsightPanel from './components/PlanningInsightPanel.vue'
 
-const navigationItems = [
-  { key: 'auth', label: '账户接入', requiresAuth: false },
-  { key: 'profile', label: '学生画像', requiresAuth: true },
-  { key: 'chat', label: '智能对话', requiresAuth: true },
-  { key: 'planning', label: '规划引擎', requiresAuth: true },
-  { key: 'archive', label: '归档中心', requiresAuth: true },
-]
-
-const tabMeta = {
-  auth: { title: '账户认证与接口入口', description: '负责用户登录、注册、JWT 持久化与账户资料维护。' },
-  profile: { title: '学生画像采集与补全', description: '简历上传和手动输入都走后端画像接口。' },
-  chat: { title: 'AI 对话与上下文恢复', description: '对话依赖画像与会话 ID，刷新后仍可恢复上下文。' },
-  planning: { title: '岗位匹配与行动规划', description: '公开岗位搜索与受保护的匹配、计划、报告接口在此汇合。' },
-  archive: { title: '历史计划与报告归档', description: '归档区支持计划复用、报告详情查看、润色和导出。' },
-}
-
-const currentTab = ref('auth')
+const currentTab = ref('upload')
+const isUploaded = ref(false)
+const uploadedResumeName = ref('')
+const userInput = ref('')
+const chatWindow = ref(null)
+const isAnalyzing = ref(false)
+const analysisProgress = ref(0)
 const authMode = ref('login')
+const authLoading = ref(false)
 const currentUser = ref(null)
-const studentProfile = ref(null)
-const missingFields = ref([])
-const chatMessages = ref([])
-const chatInput = ref('')
-const chatSessionId = ref(getChatSessionId())
-const jobResults = ref([])
-const recommendedJobs = ref([])
-const selectedJobId = ref(null)
-const selectedJobDetail = ref(null)
-const selectedJobPath = ref(null)
-const matchInsight = ref(null)
-const planItems = ref([])
+const currentProfile = ref(null)
+const activeReport = ref(null)
 const activePlan = ref(null)
 const reportItems = ref([])
-const activeReport = ref(null)
-const statusBanner = ref({ type: 'info', text: '' })
+const planItems = ref([])
+const recommendedJobs = ref([])
+const chatSessionId = ref(getChatSessionId())
+const notice = ref({ type: 'info', text: '' })
+const messages = ref([])
+
+const loading = reactive({ bootstrap: false, profile: false, chat: false, report: false, archive: false })
 
 const authForm = reactive({ account: '', username: '', email: '', password: '' })
-const userProfileForm = reactive({ nickname: '', avatar: '', phone: '' })
-const profileForm = reactive({
-  educationSummary: '',
-  skillsText: '',
-  experiencesText: '',
-  certificatesText: '',
-  innovationSummary: '',
-  interestSummary: '',
-  personalitySummary: '',
-})
-const jobSearchForm = reactive({ keyword: '', industry: '', location: '', page: 1, size: 8 })
-const loading = reactive({ auth: false, user: false, profile: false, jobs: false, recommend: false, chat: false, plan: false, report: false, polish: false, export: false })
+
+const tabNames = { upload: '简历上传', chat: 'AI 深度对话', report: '职业晋升路径', archive: '个人档案库' }
 
 const isAuthenticated = computed(() => Boolean(currentUser.value && getAccessToken()))
-const displayName = computed(() => currentUser.value?.nickname || currentUser.value?.username || '已登录用户')
-const activeProfileId = computed(() => studentProfile.value?.profileId || getActiveProfileId())
+const activeProfileId = computed(() => currentProfile.value?.profileId || getActiveProfileId())
+const topBarStatus = computed(() => {
+  if (!isAuthenticated.value) return '未登录'
+  if (!currentProfile.value) return `已登录：${currentUser.value?.nickname || currentUser.value?.username || currentUser.value?.email}`
+  return `已登录：${currentUser.value?.nickname || currentUser.value?.username || currentUser.value?.email} · 画像 #${currentProfile.value.profileId}`
+})
 
 function setNotice(text, type = 'info') {
-  statusBanner.value = { text, type }
+  notice.value = { text, type }
 }
 
-function clearTransientState() {
-  studentProfile.value = null
-  missingFields.value = []
-  chatMessages.value = []
-  chatInput.value = ''
-  chatSessionId.value = ''
-  recommendedJobs.value = []
-  selectedJobId.value = null
-  selectedJobDetail.value = null
-  selectedJobPath.value = null
-  matchInsight.value = null
-  planItems.value = []
-  activePlan.value = null
-  reportItems.value = []
-  activeReport.value = null
+function formatPercent(value) {
+  if (value == null || Number.isNaN(Number(value))) return '--'
+  return `${Number(value).toFixed(0)}%`
+}
+
+function formatDate(value) {
+  if (!value) return '刚刚生成'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+
+function normalizeChatMessages(list) {
+  return (list || []).filter((item) => item?.content).map((item) => ({ role: String(item.role || '').toLowerCase() === 'user' ? 'user' : 'ai', text: item.content }))
+}
+
+function seedPrototypeMessages(profile = currentProfile.value) {
+  const intro = profile?.resumeFileName ? `你好！我已经读取了你的简历《${profile.resumeFileName}》。` : '你好！我已经读取了你的简历。'
+  const followUp = profile?.missingFields?.length
+    ? `当前还建议你补充：${profile.missingFields.join('、')}。你也可以直接告诉我目标岗位、项目亮点或求职担忧。`
+    : '你可以继续补充目标岗位、项目亮点、技能细节或求职担忧，我会基于真实画像继续回答。'
+  messages.value = [{ role: 'ai', text: `${intro}${followUp}` }]
 }
 
 function resetAuthForm() {
@@ -407,272 +370,202 @@ function resetAuthForm() {
   authForm.password = ''
 }
 
-function syncUserProfileForm(user) {
-  userProfileForm.nickname = user?.nickname || ''
-  userProfileForm.avatar = user?.avatar || ''
-  userProfileForm.phone = user?.phone || ''
+function resetPrototypeFlow() {
+  isUploaded.value = false
+  uploadedResumeName.value = ''
+  currentProfile.value = null
+  activeReport.value = null
+  activePlan.value = null
+  reportItems.value = []
+  planItems.value = []
+  recommendedJobs.value = []
+  chatSessionId.value = ''
+  currentTab.value = 'upload'
+  userInput.value = ''
+  clearStoredChatSessionId()
+  seedPrototypeMessages(null)
 }
 
-function syncStudentProfileForm(profile) {
-  profileForm.educationSummary = profile?.educationSummary || ''
-  profileForm.skillsText = (profile?.skills || []).join('\n')
-  profileForm.experiencesText = (profile?.experiences || []).join('\n')
-  profileForm.certificatesText = (profile?.certificates || []).join('\n')
-  profileForm.innovationSummary = profile?.innovationSummary || ''
-  profileForm.interestSummary = profile?.interestSummary || ''
-  profileForm.personalitySummary = profile?.personalitySummary || ''
-}
-
-function parseList(rawValue) {
-  if (!rawValue) {
-    return []
-  }
-  return [...new Set(rawValue.split(/\r?\n|,|，|;/).map((item) => item.trim()).filter(Boolean))]
-}
-
-function optionalText(value) {
-  const normalized = value?.trim() || ''
-  return normalized || null
-}
-
-function buildProfilePayload() {
-  return {
-    educationSummary: optionalText(profileForm.educationSummary),
-    skills: parseList(profileForm.skillsText),
-    experiences: parseList(profileForm.experiencesText),
-    certificates: parseList(profileForm.certificatesText),
-    innovationSummary: optionalText(profileForm.innovationSummary),
-    interestSummary: optionalText(profileForm.interestSummary),
-    personalitySummary: optionalText(profileForm.personalitySummary),
-  }
-}
-
-function seedChatMessages() {
-  if (!isAuthenticated.value) {
-    chatMessages.value = [{ id: 'guest', role: 'AI', content: '登录后即可使用受保护的对话接口，我会基于你的画像给出职业建议。' }]
-    return
-  }
-  if (!studentProfile.value) {
-    chatMessages.value = [{ id: 'profile-needed', role: 'AI', content: '先上传简历或补全画像，之后我就能结合你的背景继续分析。' }]
-    return
-  }
-  chatMessages.value = [{ id: 'profile-ready', role: 'AI', content: missingFields.value.length ? `画像仍建议补充：${missingFields.value.join('、')}。你也可以直接问我岗位方向和技能差距。` : '画像已准备完成，你可以直接咨询目标岗位、技能提升路径或计划执行策略。' }]
-}
-
-async function refreshJobSearch() {
-  loading.jobs = true
-  try {
-    const pageData = await searchJobs(jobSearchForm)
-    jobResults.value = pageData?.records || []
-    const selectedJobStillExists = jobResults.value.some((job) => job.jobId === selectedJobId.value)
-    if ((!selectedJobId.value || !selectedJobStillExists) && jobResults.value.length) {
-      await handleSelectJob(jobResults.value[0].jobId, false)
+function validateAuthForm() {
+  if (authMode.value === 'register') {
+    if (!authForm.username || !authForm.email || !authForm.password) {
+      setNotice('注册时请完整填写用户名、邮箱和密码。', 'warning')
+      return false
     }
-  } catch (error) {
-    setNotice(error.message || '岗位搜索失败，请检查后端服务。', 'error')
-  } finally {
-    loading.jobs = false
+    return true
   }
+  if (!authForm.account || !authForm.password) {
+    setNotice('登录时请输入用户名或邮箱，以及密码。', 'warning')
+    return false
+  }
+  return true
 }
 
-async function handleSelectJob(jobId, showNotice = true) {
-  selectedJobId.value = jobId
-  try {
-    const [detail, path] = await Promise.all([getJobDetail(jobId), getJobPath(jobId)])
-    selectedJobDetail.value = detail
-    selectedJobPath.value = path
-    matchInsight.value = activeProfileId.value ? await analyzeMatch({ profileId: activeProfileId.value, jobId }) : null
-    if (showNotice) {
-      setNotice(`已切换到岗位「${detail.title}」。`, 'success')
-    }
-  } catch (error) {
-    setNotice(error.message || '岗位详情加载失败。', 'error')
-  }
-}
-
-async function refreshRecommendations() {
-  if (!activeProfileId.value) {
-    recommendedJobs.value = []
-    return
-  }
-  loading.recommend = true
-  try {
-    recommendedJobs.value = await recommendJobs({ profileId: activeProfileId.value, topN: 5 })
-    const preferredJobId = selectedJobId.value || recommendedJobs.value[0]?.jobId
-    if (preferredJobId) {
-      await handleSelectJob(preferredJobId, false)
-    }
-  } catch (error) {
-    recommendedJobs.value = []
-    setNotice(error.message || '岗位推荐暂时不可用。', 'warning')
-  } finally {
-    loading.recommend = false
-  }
-}
-
-async function refreshPlans(selectCurrent = true) {
-  if (!activeProfileId.value) {
-    planItems.value = []
-    activePlan.value = null
-    return
-  }
-  const plans = await listPlans(activeProfileId.value)
-  planItems.value = plans
-  if (!selectCurrent) {
-    return
-  }
-  if (activePlan.value) {
-    activePlan.value = plans.find((item) => item.planId === activePlan.value.planId) || null
-    return
-  }
-  activePlan.value = plans[0] || null
-}
-
-async function refreshReports(selectCurrent = true) {
-  if (!activeProfileId.value) {
-    reportItems.value = []
-    activeReport.value = null
-    return
-  }
-  const reports = await listReports(activeProfileId.value)
-  reportItems.value = reports
-  if (!selectCurrent) {
-    return
-  }
-  const preferredReportId = activeReport.value?.reportId || reports[0]?.reportId
-  activeReport.value = preferredReportId ? await getReport(preferredReportId) : null
-}
-
-async function hydrateProfile(profileId) {
+async function loadProfile(profileId) {
+  if (!profileId || !isAuthenticated.value) return null
   loading.profile = true
   try {
     const profile = await getStudentProfile(profileId)
-    studentProfile.value = profile
+    currentProfile.value = profile
     setActiveProfileId(profile.profileId)
-    syncStudentProfileForm(profile)
-    missingFields.value = await getProfileMissingFields(profile.profileId)
-    seedChatMessages()
-    await Promise.all([refreshRecommendations(), refreshPlans(), refreshReports()])
-    if (chatSessionId.value) {
-      await refreshChatMessages()
-    }
+    uploadedResumeName.value = profile.resumeFileName || uploadedResumeName.value
+    isUploaded.value = Boolean(profile.resumeFileName)
+    return profile
   } catch (error) {
-    setNotice(error.message || '画像加载失败。', 'error')
+    setNotice(error.message || '学生画像读取失败。', 'error')
+    return null
   } finally {
     loading.profile = false
   }
 }
 
-async function refreshChatMessages() {
-  if (!chatSessionId.value) {
-    seedChatMessages()
-    return
-  }
+async function loadArchiveData(profileId = activeProfileId.value, options = {}) {
+  if (!profileId || !isAuthenticated.value) return
+  if (!options.silent) loading.archive = true
   try {
-    const history = await getChatHistory(chatSessionId.value)
-    chatMessages.value = history?.messages?.length ? history.messages : []
-    if (!chatMessages.value.length) {
-      seedChatMessages()
-    }
-  } catch (error) {
-    chatSessionId.value = ''
-    clearStoredChatSessionId()
-    seedChatMessages()
-    setNotice(error.message || '历史会话恢复失败，已重置聊天上下文。', 'warning')
+    const [reports, plans, jobs] = await Promise.all([
+      listReports(profileId).catch(() => []),
+      listPlans(profileId).catch(() => []),
+      recommendJobs({ profileId, topN: 3 }).catch(() => []),
+    ])
+    reportItems.value = Array.isArray(reports) ? reports : []
+    planItems.value = Array.isArray(plans) ? plans : []
+    recommendedJobs.value = Array.isArray(jobs) ? jobs : []
+    if (!activePlan.value && planItems.value.length) activePlan.value = planItems.value[0]
+    if (!activeReport.value && reportItems.value.length) activeReport.value = await getReport(reportItems.value[0].reportId).catch(() => null)
+  } finally {
+    if (!options.silent) loading.archive = false
   }
 }
 
-async function initializeApp() {
-  await refreshJobSearch()
-  if (!getAccessToken()) {
-    seedChatMessages()
+async function loadChatHistoryIfNeeded() {
+  if (!isAuthenticated.value || !isUploaded.value) {
+    seedPrototypeMessages(currentProfile.value)
     return
   }
+  if (!chatSessionId.value) {
+    seedPrototypeMessages(currentProfile.value)
+    return
+  }
+  loading.chat = true
+  try {
+    const history = await getChatHistory(chatSessionId.value, 1, 50)
+    const normalized = normalizeChatMessages(history?.messages)
+    messages.value = normalized.length ? normalized : []
+    if (!messages.value.length) seedPrototypeMessages(currentProfile.value)
+  } catch (error) {
+    clearStoredChatSessionId()
+    chatSessionId.value = ''
+    seedPrototypeMessages(currentProfile.value)
+    setNotice(error.message || '聊天记录恢复失败，已为你开启新会话。', 'warning')
+  } finally {
+    loading.chat = false
+  }
+}
+
+async function bootstrapProfileContext(profileId = getActiveProfileId()) {
+  if (!profileId) {
+    seedPrototypeMessages(currentProfile.value)
+    return
+  }
+  const profile = await loadProfile(profileId)
+  if (!profile) {
+    seedPrototypeMessages(null)
+    return
+  }
+  await loadArchiveData(profile.profileId, { silent: true })
+  await loadChatHistoryIfNeeded()
+}
+
+async function initializeAuth() {
+  if (!getAccessToken()) {
+    currentUser.value = null
+    seedPrototypeMessages(null)
+    return
+  }
+  loading.bootstrap = true
   try {
     currentUser.value = await getCurrentUserProfile()
-    syncUserProfileForm(currentUser.value)
-    currentTab.value = 'profile'
-    const profileId = getActiveProfileId()
-    if (profileId) {
-      await hydrateProfile(profileId)
-    } else {
-      seedChatMessages()
-    }
+    await bootstrapProfileContext()
   } catch (error) {
     clearClientSession()
     currentUser.value = null
-    clearTransientState()
-    seedChatMessages()
-    setNotice(error.message || '本地登录状态已失效，请重新登录。', 'warning')
+    resetPrototypeFlow()
+    setNotice('本地登录状态已失效，请重新登录。', 'warning')
+  } finally {
+    loading.bootstrap = false
   }
 }
 
 async function handleAuthSubmit() {
-  loading.auth = true
+  if (!validateAuthForm()) return
+  authLoading.value = true
   try {
-    const loginResponse = authMode.value === 'register'
-      ? (await registerUser({ username: authForm.username, email: authForm.email, password: authForm.password }), await loginUser({ account: authForm.username, password: authForm.password }))
-      : await loginUser({ account: authForm.account, password: authForm.password })
-    currentUser.value = loginResponse.user
-    resetAuthForm()
-    syncUserProfileForm(currentUser.value)
-    currentTab.value = 'profile'
-    setNotice(authMode.value === 'register' ? '注册成功，已自动完成登录。' : '登录成功，JWT 已保存到本地。', 'success')
-    if (getActiveProfileId()) {
-      await hydrateProfile(getActiveProfileId())
+    if (authMode.value === 'register') {
+      await registerUser({ username: authForm.username, email: authForm.email, password: authForm.password })
+      const loginResponse = await loginUser({ account: authForm.username, password: authForm.password })
+      currentUser.value = loginResponse?.user || (await getCurrentUserProfile())
+      setNotice('注册成功，已自动登录。', 'success')
     } else {
-      clearTransientState()
-      seedChatMessages()
-      await refreshJobSearch()
+      const loginResponse = await loginUser({ account: authForm.account, password: authForm.password })
+      currentUser.value = loginResponse?.user || (await getCurrentUserProfile())
+      setNotice('登录成功。', 'success')
     }
+    resetAuthForm()
+    activeReport.value = null
+    activePlan.value = null
+    await bootstrapProfileContext()
   } catch (error) {
-    setNotice(error.message || '认证失败，请检查输入信息。', 'error')
+    setNotice(error.message || '登录或注册失败。', 'error')
   } finally {
-    loading.auth = false
+    authLoading.value = false
   }
 }
 
 async function handleLogout() {
-  loading.auth = true
+  authLoading.value = true
   try {
     await logoutUser()
     currentUser.value = null
     resetAuthForm()
-    clearTransientState()
-    seedChatMessages()
-    currentTab.value = 'auth'
-    setNotice('已安全退出登录。', 'success')
+    resetPrototypeFlow()
+    setNotice('已退出登录。', 'success')
   } catch (error) {
     setNotice(error.message || '退出登录失败。', 'error')
   } finally {
-    loading.auth = false
+    authLoading.value = false
   }
 }
 
-async function handleUserProfileSave() {
-  loading.user = true
-  try {
-    currentUser.value = await updateCurrentUserProfile({ nickname: optionalText(userProfileForm.nickname), avatar: optionalText(userProfileForm.avatar), phone: optionalText(userProfileForm.phone) })
-    syncUserProfileForm(currentUser.value)
-    setNotice('账户资料已同步到后端。', 'success')
-  } catch (error) {
-    setNotice(error.message || '账户资料更新失败。', 'error')
-  } finally {
-    loading.user = false
-  }
-}
-
-async function handleResumeUpload(event) {
+async function handleUpload(event) {
   const [file] = event.target.files || []
-  if (!file) {
+  if (!file) return
+  if (!file.size) {
+    event.target.value = ''
+    setNotice(`上传失败：文件“${file.name || '未命名文件'}”是空文件，请重新选择非 0 KB 的 PDF、DOC 或 DOCX。`, 'warning')
     return
   }
+  if (!isAuthenticated.value) {
+    event.target.value = ''
+    setNotice('请先登录后再上传简历。', 'warning')
+    return
+  }
+
   loading.profile = true
   try {
     const response = await uploadResumeFile(file)
-    await hydrateProfile(response.profileId)
+    if (response?.profileId) setActiveProfileId(response.profileId)
+    clearStoredChatSessionId()
+    chatSessionId.value = ''
+    activeReport.value = null
+    activePlan.value = null
+    const profile = await loadProfile(response?.profileId)
+    await loadArchiveData(response?.profileId, { silent: true })
+    seedPrototypeMessages(profile)
+    isUploaded.value = true
+    uploadedResumeName.value = file.name
     currentTab.value = 'chat'
-    setNotice(`简历「${file.name}」已上传，画像解析进度 ${response.parseProgress}%。`, 'success')
+    setNotice(response?.parseProgress != null ? `简历上传成功，解析进度 ${response.parseProgress}%，后续页面已开始联动真实数据。` : '简历上传成功，后续页面已开始联动真实数据。', 'success')
   } catch (error) {
     setNotice(error.message || '简历上传失败。', 'error')
   } finally {
@@ -681,43 +574,23 @@ async function handleResumeUpload(event) {
   }
 }
 
-async function handleProfileSubmit() {
-  loading.profile = true
-  try {
-    const payload = buildProfilePayload()
-    const creatingProfile = !studentProfile.value
-    if (creatingProfile) {
-      const response = await createProfileByManualInput(payload)
-      await hydrateProfile(response.profileId)
-    } else {
-      const updated = missingFields.value.length ? await completeStudentProfile(studentProfile.value.profileId, payload) : await updateStudentProfile(studentProfile.value.profileId, payload)
-      await hydrateProfile(updated.profileId)
-    }
-    currentTab.value = 'chat'
-    setNotice(creatingProfile ? '学生画像已创建。' : '学生画像已更新。', 'success')
-  } catch (error) {
-    setNotice(error.message || '画像保存失败。', 'error')
-  } finally {
-    loading.profile = false
-  }
-}
+async function sendMessage() {
+  if (!isAuthenticated.value) return setNotice('请先登录后再进行 AI 对话。', 'warning')
+  if (!isUploaded.value || !activeProfileId.value) return setNotice('请先上传简历后再开始对话。', 'warning')
+  if (!userInput.value.trim()) return
 
-async function handleSendMessage() {
-  const content = chatInput.value.trim()
-  if (!content) {
-    return
-  }
-  const optimisticMessage = { id: `local-${Date.now()}`, role: 'USER', content }
-  chatMessages.value = [...chatMessages.value, optimisticMessage]
-  chatInput.value = ''
+  const value = userInput.value.trim()
+  messages.value.push({ role: 'user', text: value })
+  userInput.value = ''
   loading.chat = true
   try {
-    const response = await sendChatMessage({ message: content, sessionId: chatSessionId.value || null })
-    chatSessionId.value = response.sessionId
-    setChatSessionId(response.sessionId)
-    chatMessages.value = [...chatMessages.value, response.reply]
+    const response = await sendChatMessage({ message: value, sessionId: chatSessionId.value || undefined })
+    if (response?.sessionId) {
+      chatSessionId.value = response.sessionId
+      setChatSessionId(response.sessionId)
+    }
+    if (response?.reply?.content) messages.value.push({ role: 'ai', text: response.reply.content })
   } catch (error) {
-    chatMessages.value = chatMessages.value.filter((message) => message.id !== optimisticMessage.id)
     setNotice(error.message || '消息发送失败。', 'error')
   } finally {
     loading.chat = false
@@ -726,187 +599,188 @@ async function handleSendMessage() {
 
 async function handleClearChat() {
   if (!chatSessionId.value) {
-    seedChatMessages()
+    seedPrototypeMessages(currentProfile.value)
+    setNotice('当前还没有持久化会话，已重置为初始引导语。', 'success')
     return
   }
   loading.chat = true
   try {
     await clearChatHistory(chatSessionId.value)
-    chatSessionId.value = ''
     clearStoredChatSessionId()
-    seedChatMessages()
-    setNotice('聊天记录已清空。', 'success')
+    chatSessionId.value = ''
+    seedPrototypeMessages(currentProfile.value)
+    setNotice('已清空当前对话会话。', 'success')
   } catch (error) {
-    setNotice(error.message || '清空聊天失败。', 'error')
+    setNotice(error.message || '清空对话失败。', 'error')
   } finally {
     loading.chat = false
   }
 }
 
-async function handleGeneratePlan() {
-  if (!activeProfileId.value) {
-    setNotice('请先创建学生画像。', 'warning')
-    return
-  }
-  loading.plan = true
-  try {
-    const generatedPlan = await generatePlan({ profileId: activeProfileId.value, targetJobId: selectedJobId.value || null })
-    activePlan.value = generatedPlan
-    await refreshPlans(false)
-    planItems.value = [generatedPlan, ...planItems.value.filter((item) => item.planId !== generatedPlan.planId)]
-    setNotice('阶段计划已生成。', 'success')
-  } catch (error) {
-    setNotice(error.message || '计划生成失败。', 'error')
-  } finally {
-    loading.plan = false
-  }
-}
-
-async function handleCompleteTask(taskId) {
-  if (!activePlan.value) {
-    return
-  }
-  loading.plan = true
-  try {
-    activePlan.value = await completePlanTask(activePlan.value.planId, taskId)
-    await refreshPlans(false)
-    setNotice('任务进度已更新。', 'success')
-  } catch (error) {
-    setNotice(error.message || '任务状态更新失败。', 'error')
-  } finally {
-    loading.plan = false
-  }
-}
-
-async function openPlan(planId) {
-  loading.plan = true
-  try {
-    activePlan.value = await getPlan(planId)
-  } catch (error) {
-    setNotice(error.message || '计划详情加载失败。', 'error')
-  } finally {
-    loading.plan = false
-  }
-}
-
-async function handleGenerateReport() {
-  if (!activeProfileId.value) {
-    setNotice('请先创建学生画像。', 'warning')
-    return
-  }
-  loading.report = true
-  try {
-    const response = await generateReport({ profileId: activeProfileId.value, targetJobId: selectedJobId.value || null })
-    const generatedReport = await getReport(response.reportId)
-    activeReport.value = generatedReport
-    await refreshReports(false)
-    reportItems.value = [
-      {
-        reportId: generatedReport.reportId,
-        profileId: generatedReport.profileId,
-        targetJobId: generatedReport.targetJobId,
-        title: generatedReport.title,
-        createdAt: generatedReport.createdAt,
-      },
-      ...reportItems.value.filter((item) => item.reportId !== generatedReport.reportId),
-    ]
-    currentTab.value = 'archive'
-    setNotice('职业报告已生成。', 'success')
-  } catch (error) {
-    setNotice(error.message || '报告生成失败。', 'error')
-  } finally {
-    loading.report = false
-  }
-}
-
 async function openReport(reportId) {
+  if (!reportId) return
   loading.report = true
   try {
     activeReport.value = await getReport(reportId)
+    currentTab.value = 'report'
   } catch (error) {
-    setNotice(error.message || '报告详情加载失败。', 'error')
+    setNotice(error.message || '读取报告详情失败。', 'error')
   } finally {
     loading.report = false
   }
 }
 
-async function handlePolishReport() {
-  if (!activeReport.value) {
-    return
-  }
-  loading.polish = true
+async function openLatestReport() {
+  if (!reportItems.value.length) return setNotice('当前还没有已生成的报告。', 'warning')
+  await openReport(reportItems.value[0].reportId)
+}
+
+async function openPlan(plan) {
+  if (!plan?.planId) return
+  loading.archive = true
   try {
-    const polishedContent = await polishGeneratedReport(activeReport.value.reportId)
-    activeReport.value = { ...activeReport.value, polishedContent }
-    setNotice('报告润色完成。', 'success')
+    activePlan.value = plan.tasks ? plan : await getPlan(plan.planId)
+    currentTab.value = 'report'
   } catch (error) {
-    setNotice(error.message || '报告润色失败。', 'error')
+    setNotice(error.message || '读取计划详情失败。', 'error')
   } finally {
-    loading.polish = false
+    loading.archive = false
   }
 }
 
-async function handleExportReport(format) {
-  if (!activeReport.value) {
-    return
-  }
-  loading.export = true
+async function startAnalysis(targetJobId = recommendedJobs.value[0]?.jobId || null) {
+  if (!isAuthenticated.value) return setNotice('请先登录后再生成报告。', 'warning')
+  if (!isUploaded.value || !activeProfileId.value) return setNotice('请先上传简历。', 'warning')
+
+  isAnalyzing.value = true
+  analysisProgress.value = 8
+  const timer = setInterval(() => {
+    analysisProgress.value = Math.min(analysisProgress.value + 8, 88)
+  }, 250)
+
   try {
-    const { blob, filename } = await exportGeneratedReport(activeReport.value.reportId, format)
-    const objectUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = objectUrl
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(objectUrl)
-    setNotice(`报告已导出为 ${filename}。`, 'success')
+    const [reportGenerateResponse, generatedPlan] = await Promise.all([
+      generateReport({ profileId: activeProfileId.value, targetJobId }),
+      planItems.value.length ? Promise.resolve(activePlan.value || planItems.value[0]) : generatePlan({ profileId: activeProfileId.value, targetJobId }),
+    ])
+    if (generatedPlan?.planId) activePlan.value = generatedPlan
+    activeReport.value = await getReport(reportGenerateResponse.reportId)
+    await loadArchiveData(activeProfileId.value, { silent: true })
+    analysisProgress.value = 100
+    setTimeout(() => {
+      currentTab.value = 'report'
+      setNotice('真实报告与成长计划已联动完成。', 'success')
+    }, 250)
   } catch (error) {
-    setNotice(error.message || '报告导出失败。', 'error')
+    setNotice(error.message || '报告生成失败。', 'error')
   } finally {
-    loading.export = false
+    clearInterval(timer)
+    setTimeout(() => {
+      isAnalyzing.value = false
+      analysisProgress.value = 0
+    }, 400)
   }
 }
 
-function formatDate(value) {
-  if (!value) {
-    return '未生成'
-  }
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
-}
-
-function formatPercent(value) {
-  if (value == null || Number.isNaN(Number(value))) {
-    return '--'
-  }
-  return `${Number(value).toFixed(2)}%`
-}
-
-function formatSalaryRange(min, max) {
-  if (min == null && max == null) {
-    return '薪资待补充'
-  }
-  return `${min ?? '--'} - ${max ?? '--'}`
-}
-
-async function handlePlanAdjusted(plan) {
-  activePlan.value = plan
-  await refreshPlans(false)
-}
-
-function handleInsightNotice(payload) {
-  if (!payload) {
-    return
-  }
-  setNotice(payload.text, payload.type)
-}
+watch(messages, () => {
+  nextTick(() => {
+    if (chatWindow.value) chatWindow.value.scrollTop = chatWindow.value.scrollHeight
+  })
+}, { deep: true })
 
 onMounted(() => {
-  initializeApp()
+  seedPrototypeMessages(null)
+  initializeAuth()
 })
 </script>
 
-
-
-
-
-
+<style scoped>
+.app-container { display: flex; height: 100vh; background: #fdfcf0; font-family: sans-serif; }
+.sidebar { width: 280px; background: #b1c9e8; padding: 20px; display: flex; flex-direction: column; gap: 18px; backdrop-filter: blur(10px); border-right: 1px solid rgba(255,255,255,0.3); }
+.logo { font-size: 1.5rem; color: white; font-weight: bold; }
+.auth-card, .overview-card, .metric-card, .insight-card, .archive-panel, .profile-panel, .status-card, .empty-state { background: rgba(255,255,255,0.88); border-radius: 16px; border: 1px solid rgba(255,255,255,0.45); }
+.auth-card { padding: 14px; display: grid; gap: 12px; }
+.auth-toggle { display: flex; gap: 8px; }
+.auth-toggle-btn, .primary-btn, .secondary-btn, .secondary-inline-btn { border: none; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.auth-toggle-btn { flex: 1; background: rgba(177,201,232,0.45); color: #4a5568; }
+.auth-toggle-btn.active, .primary-btn { background: #7d9bbd; color: white; }
+.secondary-btn, .secondary-inline-btn { background: #d4e4bc; color: #4a5568; }
+.auth-form { display: grid; gap: 10px; }
+.auth-form input, .chat-input-area input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #ddd; outline: none; }
+.auth-user strong { display: block; color: #4a5568; }
+.auth-user p, .auth-user small { display: block; margin: 6px 0 0; color: #717a87; }
+.nav-item { padding: 15px; margin-bottom: 8px; border-radius: 10px; cursor: pointer; color: #4a5568; }
+.nav-item.active { background: white; color: #7d9bbd; font-weight: bold; }
+.sidebar-summary { display: grid; gap: 10px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.2); color: white; }
+.sidebar-summary span { display: block; font-size: 0.85rem; }
+.sidebar-summary strong { font-size: 1.15rem; }
+.user-info { margin-top: auto; color: white; font-size: 0.95rem; }
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.top-bar { padding: 15px 30px; background: white; border-bottom: 1px solid #eee; color: #717a87; display: flex; justify-content: space-between; gap: 12px; }
+.notice { margin: 16px 32px 0; padding: 12px 14px; border-radius: 12px; }
+.notice.info { background: #eef2ff; color: #4a5568; }
+.notice.success { background: #e5f4df; color: #4f6a44; }
+.notice.warning { background: #fff3d6; color: #8c6a2c; }
+.notice.error { background: #fde4e1; color: #9a4d43; }
+.content-body, .chat-body, .report-body { padding: 40px; flex: 1; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
+.welcome-text { max-width: 760px; text-align: center; }
+.welcome-text h1 { color: #717a87; font-weight: 800; font-size: 2.2rem; }
+.welcome-text p, .empty-state p, .upload-hint, .section-item p, .plan-summary, .archive-item p, .overview-card p, .metric-card span, .recommend-item p, .recommend-item span, .task-item p, .task-item span, .profile-panel p { color: #717a87; }
+.report-body h2, .content-body h2 { color: #717a87 !important; font-weight: 800; margin-bottom: 24px; }
+.upload-zone { width: 100%; max-width: 620px; margin-top: 20px; }
+.upload-card { padding: 60px; border: 3px dashed #b1c9e8; background: white; border-radius: 24px; text-align: center; position: relative; }
+.hidden-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.icon { font-size: 3rem; margin-bottom: 10px; }
+.status-card { margin-top: 20px; padding: 14px 18px; color: #5a6e4d; }
+.profile-overview-grid, .report-metric-grid, .insight-grid, .archive-grid { width: 100%; max-width: 1100px; display: grid; gap: 16px; }
+.profile-overview-grid, .report-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 24px; }
+.overview-card, .metric-card, .insight-card, .archive-panel { padding: 18px; }
+.overview-card span, .metric-card span { display: block; font-size: 0.92rem; }
+.overview-card strong, .metric-card strong { display: block; margin: 8px 0; font-size: 1.4rem; color: #4a5568; }
+.chat-meta-row { width: 100%; max-width: 760px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.meta-chip { padding: 8px 12px; border-radius: 999px; background: rgba(177,201,232,0.22); color: #5a6a7d; }
+.chat-window { width: 100%; max-width: 760px; height: 430px; background: white; border-radius: 15px; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid #eee; }
+.message-row { margin-bottom: 10px; display: flex; }
+.message-row.ai { justify-content: flex-start; }
+.message-row.user { justify-content: flex-end; }
+.bubble { padding: 10px 15px; border-radius: 15px; max-width: 74%; font-size: 0.92rem; line-height: 1.5; }
+.loading-bubble { opacity: 0.86; }
+.ai .bubble { background: #eef2ff; color: #4a5568; }
+.user .bubble { background: #d4e4bc; color: #4a5568; }
+.chat-input-area { margin-top: 15px; width: 100%; max-width: 760px; display: flex; gap: 10px; flex-wrap: wrap; }
+.send-btn, .analyze-btn, .nav-btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; }
+.send-btn, .nav-btn { background: #b1c9e8; }
+.analyze-btn { background: #d4e4bc; color: #5a6e4d; font-weight: bold; }
+.progress-mask { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 100; }
+.progress-box { text-align: center; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+.progress-bar-container { width: 300px; background: #edf2f7; border-radius: 10px; margin: 20px 0; }
+.progress-bar { height: 10px; background: #b1c9e8; border-radius: 10px; transition: width 0.3s; }
+.report-shell { width: 100%; max-width: 1120px; display: grid; gap: 20px; }
+.report-header-block { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.report-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.path-container { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.path-node { padding: 15px 24px; background: white; border: 2px solid #b1c9e8; border-radius: 10px; color: #717a87; }
+.path-node.active { background: #d4e4bc; color: #5a6e4d !important; border-color: #5a6e4d; font-weight: bold; }
+.arrow { font-size: 20px; color: #b1c9e8; }
+.insight-grid, .archive-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.insight-card h3, .archive-panel h3 { margin-top: 0; color: #4a5568; }
+.section-list, .recommend-list, .task-list, .archive-list { display: grid; gap: 12px; }
+.section-item, .task-item, .archive-item, .plan-summary, .recommend-item { padding: 14px 16px; border-radius: 14px; background: rgba(177,201,232,0.12); border: 1px solid rgba(177,201,232,0.18); }
+.section-item strong, .task-item strong, .archive-item strong, .recommend-item strong { color: #4a5568; }
+.task-item.done { background: rgba(212,228,188,0.35); }
+.recommend-item, .action-item { width: 100%; text-align: left; border: none; cursor: pointer; }
+.profile-panel { padding: 16px; }
+.archive-body { align-items: stretch; }
+.empty-state { text-align: center; padding: 40px; }
+.send-btn, .analyze-btn, .nav-btn, .upload-card, .primary-btn, .secondary-btn, .auth-toggle-btn, .secondary-inline-btn, .recommend-item, .action-item { transition: transform 0.1s ease-in-out, box-shadow 0.2s ease; }
+.send-btn:hover, .analyze-btn:hover, .nav-btn:hover, .upload-card:hover, .primary-btn:hover, .secondary-btn:hover, .auth-toggle-btn:hover, .secondary-inline-btn:hover, .recommend-item:hover, .action-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.send-btn:active, .analyze-btn:active, .nav-btn:active, .primary-btn:active, .secondary-btn:active, .auth-toggle-btn:active, .secondary-inline-btn:active, .recommend-item:active, .action-item:active { transform: scale(1.02); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+.upload-card:active { transform: scale(1.02); border-color: #d4e4bc !important; }
+@media (max-width: 1100px) { .insight-grid, .archive-grid, .profile-overview-grid, .report-metric-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .app-container { flex-direction: column; height: auto; min-height: 100vh; }
+  .sidebar { width: auto; }
+  .top-bar, .report-header-block, .chat-input-area { flex-direction: column; }
+  .chat-window, .chat-input-area, .chat-meta-row { max-width: 100%; }
+}
+</style>
