@@ -169,6 +169,12 @@
             <div class="report-actions">
               <button class="nav-btn" @click="startAnalysis" :disabled="isAnalyzing || loading.report">{{ activeReport ? '重新生成报告' : '生成报告' }}</button>
               <button class="secondary-inline-btn" @click="openLatestReport" :disabled="!reportItems.length || loading.report">刷新最新报告</button>
+              <button class="secondary-inline-btn" @click="handleExportReport('pdf')" :disabled="!activeReport || exportingFormat !== ''">
+                {{ exportingFormat === 'pdf' ? '导出中...' : '导出 PDF' }}
+              </button>
+              <button class="secondary-inline-btn" @click="handleExportReport('word')" :disabled="!activeReport || exportingFormat !== ''">
+                {{ exportingFormat === 'word' ? '导出中...' : '导出 Word' }}
+              </button>
             </div>
           </div>
 
@@ -230,7 +236,17 @@
                 <div v-for="task in activePlan.tasks" :key="task.taskId" class="task-item" :class="task.completed ? 'done' : ''">
                   <strong>{{ task.phaseName }} · {{ task.taskTitle }}</strong>
                   <p>{{ task.description }}</p>
-                  <span>{{ task.recommendedDays }} 天</span>
+                  <div class="task-footer">
+                    <span>{{ task.recommendedDays }} 天</span>
+                    <button
+                      class="secondary-inline-btn task-action-btn"
+                      type="button"
+                      @click="handleCompleteTask(task)"
+                      :disabled="task.completed || completingTaskId === task.taskId"
+                    >
+                      {{ task.completed ? '已完成' : completingTaskId === task.taskId ? '提交中...' : '标记完成' }}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div v-else class="archive-item empty">系统尚未生成计划</div>
@@ -298,9 +314,9 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { getCurrentUserProfile, loginUser, logoutUser, registerUser } from './api/modules/auth'
 import { clearChatHistory, getChatHistory, sendChatMessage } from './api/modules/chat'
 import { recommendJobs } from './api/modules/match'
-import { generatePlan, getPlan, listPlans } from './api/modules/plan'
+import { completePlanTask, generatePlan, getPlan, listPlans } from './api/modules/plan'
 import { getStudentProfile, uploadResumeFile } from './api/modules/profile'
-import { generateReport, getReport, listReports } from './api/modules/report'
+import { exportGeneratedReport, generateReport, getReport, listReports } from './api/modules/report'
 import { clearClientSession, clearStoredChatSessionId, getAccessToken, getActiveProfileId, getChatSessionId, setActiveProfileId, setChatSessionId } from './api/session'
 
 const currentTab = ref('upload')
@@ -322,6 +338,8 @@ const recommendedJobs = ref([])
 const chatSessionId = ref(getChatSessionId())
 const notice = ref({ type: 'info', text: '' })
 const messages = ref([])
+const completingTaskId = ref(null)
+const exportingFormat = ref('')
 
 const loading = reactive({ bootstrap: false, profile: false, chat: false, report: false, archive: false })
 
@@ -648,6 +666,48 @@ async function openPlan(plan) {
   }
 }
 
+async function handleCompleteTask(task) {
+  if (!activePlan.value?.planId || !task?.taskId) return
+  if (task.completed) {
+    setNotice('\u8be5\u4efb\u52a1\u5df2\u7ecf\u5b8c\u6210\uff0c\u65e0\u9700\u91cd\u590d\u63d0\u4ea4\u3002', 'info')
+    return
+  }
+  completingTaskId.value = task.taskId
+  try {
+    activePlan.value = await completePlanTask(activePlan.value.planId, task.taskId)
+    await loadArchiveData(activeProfileId.value, { silent: true })
+    setNotice(`\u4efb\u52a1\u201c${task.taskTitle}\u201d\u5df2\u6807\u8bb0\u4e3a\u5b8c\u6210\u3002`, 'success')
+  } catch (error) {
+    setNotice(error.message || '\u66f4\u65b0\u4efb\u52a1\u72b6\u6001\u5931\u8d25\u3002', 'error')
+  } finally {
+    completingTaskId.value = null
+  }
+}
+
+async function handleExportReport(format) {
+  if (!activeReport.value?.reportId) {
+    setNotice('\u8bf7\u5148\u751f\u6210\u6216\u6253\u5f00\u4e00\u4efd\u62a5\u544a\u540e\u518d\u5bfc\u51fa\u3002', 'warning')
+    return
+  }
+  exportingFormat.value = format
+  try {
+    const { blob, filename } = await exportGeneratedReport(activeReport.value.reportId, format)
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+    setNotice(`\u62a5\u544a\u5df2\u5bfc\u51fa\u4e3a${format === 'word' ? ' Word' : ' PDF'}\u3002`, 'success')
+  } catch (error) {
+    setNotice(error.message || '\u62a5\u544a\u5bfc\u51fa\u5931\u8d25\u3002', 'error')
+  } finally {
+    exportingFormat.value = ''
+  }
+}
+
 async function startAnalysis(targetJobId = recommendedJobs.value[0]?.jobId || null) {
   if (!isAuthenticated.value) return setNotice('请先登录后再生成报告。', 'warning')
   if (!isUploaded.value || !activeProfileId.value) return setNotice('请先上传简历。', 'warning')
@@ -768,6 +828,8 @@ onMounted(() => {
 .section-item, .task-item, .archive-item, .plan-summary, .recommend-item { padding: 14px 16px; border-radius: 14px; background: rgba(177,201,232,0.12); border: 1px solid rgba(177,201,232,0.18); }
 .section-item strong, .task-item strong, .archive-item strong, .recommend-item strong { color: #4a5568; }
 .task-item.done { background: rgba(212,228,188,0.35); }
+.task-footer { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.task-action-btn { white-space: nowrap; }
 .recommend-item, .action-item { width: 100%; text-align: left; border: none; cursor: pointer; }
 .profile-panel { padding: 16px; }
 .archive-body { align-items: stretch; }
@@ -784,3 +846,4 @@ onMounted(() => {
   .chat-window, .chat-input-area, .chat-meta-row { max-width: 100%; }
 }
 </style>
+

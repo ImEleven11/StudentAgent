@@ -52,7 +52,7 @@ public class ChatServiceImpl implements ChatService {
         userService.loadActiveUser(userId);
         String sessionId = resolveOrCreateSession(userId, request.getSessionId(), ChatSessionType.GENERAL);
 
-        ChatMessageEntity userMessage = persistMessage(sessionId, userId, ChatRole.USER, request.getMessage());
+        persistMessage(sessionId, userId, ChatRole.USER, request.getMessage());
         ChatMessageEntity aiMessage = persistMessage(sessionId, userId, ChatRole.AI, buildAiReply(userId, request.getMessage()));
 
         return new ChatReplyResponse(sessionId, ChatMessageResponse.from(aiMessage));
@@ -82,8 +82,8 @@ public class ChatServiceImpl implements ChatService {
         String sessionId = createSession(userId, ChatSessionType.ASSESSMENT);
         String question = switch (type) {
             case "interest" -> "请告诉我，你最近最愿意主动投入时间学习或实践的方向是什么？";
-            case "personality" -> "在团队协作中，你更偏向主导推进、协调沟通，还是独立完成关键任务？";
-            case "risk" -> "面对有不确定性的岗位选择时，你更倾向稳妥路径还是高成长高波动路径？";
+            case "personality" -> "在团队协作中，你更偏向主动推进、协调沟通，还是独立完成关键任务？";
+            case "risk" -> "面对有不确定性的岗位选择时，你更倾向稳定路径还是高成长、高波动路径？";
             default -> throw new BusinessException(ErrorCode.INVALID_REQUEST, "unsupported assessment type");
         };
 
@@ -160,7 +160,7 @@ public class ChatServiceImpl implements ChatService {
     private String buildAiReply(Long userId, String userMessage) {
         StudentProfileEntity profile = studentProfileMapper.findByUserId(userId);
         if (profile == null) {
-            return "我还没有读取到你的完整画像。你可以先上传简历或手动补充教育背景、技能和项目经历。";
+            return "我还没有读取到你的完整画像。你可以先上传简历，或手动补充教育背景、技能和项目经历。";
         }
 
         boolean missingSkills = profile.getSkillsJson() == null || profile.getSkillsJson().equals("[]");
